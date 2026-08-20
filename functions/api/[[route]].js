@@ -311,7 +311,6 @@ const PROVIDERS = {
     authorize: 'https://accounts.google.com/o/oauth2/v2/auth',
     token: 'https://oauth2.googleapis.com/token',
     scope: 'openid email profile',
-    idFor: (p) => p.sub,
     async profile(accessToken) {
       const r = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
         headers: { authorization: `Bearer ${accessToken}` },
