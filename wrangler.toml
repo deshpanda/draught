@@ -5,7 +5,7 @@ pages_build_output_dir = "public"
 [[d1_databases]]
 binding = "DB"
 database_name = "draught"
-database_id = "PLACEHOLDER_RUN_WRANGLER_D1_CREATE"
+database_id = "d5c671f0-cd9a-4fce-a83d-33a7a84a5288"
 
 # Secrets (set with `npx wrangler pages secret put <NAME>`):
 #   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET

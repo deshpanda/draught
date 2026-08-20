@@ -2,6 +2,8 @@
 
 **Your beer life, on draught.**
 
+**Live: [draught-5bp.pages.dev](https://draught-5bp.pages.dev)**
+
 Log the beer you drink. Rate it in half-stars, write down what you actually
 thought, and watch your taste take shape — the beers, the breweries, the styles
 you keep coming back to.
@@ -94,19 +96,33 @@ the flag is set.
 ### Deploying
 
 ```bash
-npx wrangler d1 create draught
-npm run db:remote
-npx wrangler pages deploy
+npx wrangler d1 create draught          # paste the id into wrangler.toml
+npm run db:remote                       # schema against the real database
+npx wrangler pages project create draught --production-branch=main
+npx wrangler pages deploy --project-name=draught --branch=main
 ```
 
-Then set the secrets — `SESSION_SECRET` plus the Google client id and secret:
+Then the three secrets. `SESSION_SECRET` is generated and piped so it is
+never displayed:
 
 ```bash
-npx wrangler pages secret put SESSION_SECRET
+openssl rand -base64 32 | npx wrangler pages secret put SESSION_SECRET --project-name=draught
+```
+```bash
+npx wrangler pages secret put GOOGLE_CLIENT_ID --project-name=draught
+```
+```bash
+npx wrangler pages secret put GOOGLE_CLIENT_SECRET --project-name=draught
 ```
 
-The OAuth callback URL is `https://<your-domain>/api/auth/google/callback`.
-Sign-in is Google-only by design — one button, no provider chooser.
+Sign-in is Google-only by design — one button, no provider chooser. The
+callback URL to register in the Google console is
+`https://<your-domain>/api/auth/google/callback`, plus
+`http://localhost:8788/api/auth/google/callback` for local work.
+
+**Never set `DEV_LOGIN` in production.** It exists so the app is usable
+offline with no OAuth client registered; in production it would be an open
+door. `/api/auth/dev` 404s unless the flag is present.
 
 ## Tests
 
