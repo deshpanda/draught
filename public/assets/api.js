@@ -42,6 +42,8 @@ export const api = {
   deleteAccount: () => req('/account', { method: 'DELETE' }),
   searchVenues: (q) => req(`/venues/search?q=${encodeURIComponent(q)}`),
   map: (scope) => req(`/map?scope=${encodeURIComponent(scope)}`),
+  places: (q, near) => req(`/places?q=${encodeURIComponent(q)}${
+    near ? `&lat=${near.lat}&lon=${near.lon}` : ''}`),
 };
 
 // Photos go up as raw bytes, not multipart — there's one file and no fields.

@@ -386,3 +386,5 @@ button.chip { font: inherit; font-size: 0.84rem; cursor: pointer; }
 .tally .extra { font-family: var(--mono); font-size: 0.7rem; color: var(--faint); }
 .tally .extra a { color: var(--muted); }
 .tally .extra a:hover { color: var(--amber); }
+.geo-state.on { color: var(--amber); }
+.ac .m { display: block; }

@@ -19,6 +19,7 @@ export const LIMITS = {
   followAct:   { max: 100, window: 3600, what: 'follows' },
   handleClaim: { max: 10,  window: 3600, what: 'handle attempts' },
   brewerySearch: { max: 300, window: 3600, what: 'brewery searches' },
+  placeSearch:   { max: 300, window: 3600, what: 'place searches' },
 };
 
 const UPSERT = `

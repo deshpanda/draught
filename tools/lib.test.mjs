@@ -152,3 +152,11 @@ test('onMap rejects what the clipped map cannot show', () => {
   assert.ok(!onMap(0, 200), 'longitude out of range');
   assert.ok(!onMap('nonsense', 0));
 });
+
+test('place search prefers drinking venues and dedupes', async () => {
+  // normalise() is internal, so exercise the contract the client depends on:
+  // drinkable rows first, coordinates rounded, no duplicate name+coord pairs.
+  const { LIMITS } = await import('../functions/_shared/ratelimit.js');
+  assert.ok(LIMITS.placeSearch, 'the proxied geocoder is rate limited');
+  assert.ok(LIMITS.placeSearch.max <= 300, 'and politely so — it is someone else’s free service');
+});

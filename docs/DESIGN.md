@@ -232,6 +232,25 @@ asserting each falls inside its own country's path via `isPointInFill`. Eleven
 hit; Sydney lands 1px offshore, which is the 110m coastline's own coarseness
 (1px = 0.36° ≈ 40km), not a projection error.
 
+### Finding a place
+
+`GET /api/places` proxies **Photon** (photon.komoot.io), an OSM-based geocoder
+built for typeahead. Two alternatives were rejected: Nominatim, OSM's main
+geocoder, *explicitly forbids* autocomplete in its usage policy; and Google
+Places needs a billing account with a card on file and would put a third-party
+script on every page, which the privacy page promises there isn't.
+
+Proxying matters — Photon only ever sees this Worker, never a viewer's IP or
+identity. Responses are cached for 24h on the normalised upstream URL, so the
+same search costs Photon one request a day rather than one per keystroke (157ms
+cold, 3ms warm), and the endpoint is rate limited because it is someone else's
+free service. Results rank `amenity=pub|bar|brewery|…` above everything else,
+because this is a beer app and not a gazetteer.
+
+A picked suggestion stores its geography on the input's dataset; editing the name
+by hand clears it, or a typed-in venue would silently inherit the last
+suggestion's city and coordinates.
+
 ### The privacy line on location
 
 Publishing "who drank where" is the feature. Publishing someone's home address

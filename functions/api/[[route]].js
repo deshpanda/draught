@@ -26,7 +26,8 @@
 //   PUT    /api/lists/:id/order      { order: [beerId, ...] }
 //   GET    /api/users/:handle/lists  and .../lists/:slug
 //   DELETE /api/account              erases everything, including R2 objects
-//   GET    /api/venues/search?q=
+//   GET    /api/venues/search?q=       places already logged here
+//   GET    /api/places?q=&lat=&lon=  search the world (proxied OSM geocoder)
 //   GET    /api/map?scope=all|following|<handle>
 //
 // Every write is rate limited (see _shared/ratelimit.js) — each one mints state
@@ -42,6 +43,7 @@ import { follow, followCounts, viewerFollows, feed, people } from '../_shared/so
 import * as lists from '../_shared/lists.js';
 import { guard, actorOf } from '../_shared/ratelimit.js';
 import * as venues from '../_shared/venues.js';
+import * as places from '../_shared/places.js';
 
 export async function onRequest(context) {
   const { request, env, params } = context;
@@ -98,6 +100,14 @@ export async function onRequest(context) {
       const capped = await guard(env, 'brewerySearch', actorOf(request, null));
       if (capped) return capped;
       return json({ results: await searchBreweries(env, url.searchParams.get('q') || '') });
+    }
+
+    if (route[0] === 'places' && method === 'GET') {
+      // Proxied, so the geocoder never sees a viewer's IP. Bounded because its
+      // public instance is a free service run by someone else.
+      const capped = await guard(env, 'placeSearch', actorOf(request, null));
+      if (capped) return capped;
+      return places.search(env, url);
     }
 
     if (route[0] === 'venues' && route[1] === 'search' && method === 'GET') {

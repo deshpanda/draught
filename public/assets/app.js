@@ -242,7 +242,8 @@ function viewLog() {
           </div>
           <div class="field">
             <label for="venue">Where</label>
-            <input id="venue" name="venue" maxlength="80" placeholder="The Palace" autocomplete="off">
+            <input id="venue" name="venue" maxlength="80"
+              placeholder="Search a bar, or type any name" autocomplete="off">
             <div class="ac" id="acVenue"></div>
           </div>
         </div>
@@ -252,9 +253,11 @@ function viewLog() {
             <span class="geo-state" id="geoState">no location attached</span>
           </div>
           <label class="rank-toggle geo-off"><input type="checkbox" id="geoPrivate"> keep off the map</label>
-          <p class="hint">Pinning makes the venue's location public and permanent, so
-            everyone sees the same dot. Places named like somewhere private — “home”,
-            “my flat” — never get coordinates, whatever you pin.</p>
+          <p class="hint">Search the venue above to place it on the map, or use
+            <strong>Pin this spot</strong> for somewhere the map has never heard of.
+            A venue's location is public and permanent once set, so everyone sees the
+            same dot. Places named like somewhere private — “home”, “my flat” — never
+            get coordinates, whatever you pin.</p>
         </div>
         <button class="btn btn-amber btn-lg" type="submit" id="submit">Log it</button>
         <p class="msg" id="msg"></p>
@@ -296,35 +299,90 @@ function viewLog() {
     abvHint.textContent = s ? `${s.origin} · typically ${s.abvLow}–${s.abvHigh}%` : '';
   });
 
-  // Venue typeahead over places people have already drunk, so a bar gets one
-  // dot rather than one per spelling.
+  // The venue field searches two things at once: places people here have
+  // already drunk (so a bar keeps one dot), then the whole world via the
+  // geocoder. Known venues come first — matching an existing one is always
+  // better than minting a near-duplicate.
   let pinned = null;
+  let near = null;          // biases the world search toward you, if allowed
+  const geoState = app.querySelector('#geoState');
+
+  const setPin = (loc, label) => {
+    pinned = loc;
+    geoState.textContent = label;
+    geoState.classList.toggle('on', !!loc);
+  };
+
+  // Picking a suggestion attaches hidden geography to the field. If the name is
+  // then edited by hand it is a different place, so that geography has to go —
+  // otherwise a typed-in venue silently inherits the last suggestion's city and
+  // coordinates. `pickedValue` marks the text a pick actually produced.
+  const forgetOnEdit = (el, clear) => {
+    el.addEventListener('input', () => {
+      if (el.value !== el.dataset.pickedValue) clear();
+    });
+  };
+  forgetOnEdit(form.venue, () => {
+    delete form.venue.dataset.city;
+    delete form.venue.dataset.country;
+    if (pinned) setPin(null, 'no location attached');
+  });
+  forgetOnEdit(form.brewery, () => {
+    delete form.brewery.dataset.country;
+    delete form.brewery.dataset.city;
+    delete form.brewery.dataset.obdbId;
+  });
+
   bindAutocomplete(
     form.venue, app.querySelector('#acVenue'),
-    async (q) => (await api.searchVenues(q)).results.map((v) => ({
-      label: v.name,
-      sub: [v.city, v.country, v.pours ? plural(v.pours, 'pour') : ''].filter(Boolean).join(' · '),
-      raw: v,
-    })),
+    async (q) => {
+      const [mine, world] = await Promise.all([
+        api.searchVenues(q).then((r) => r.results).catch(() => []),
+        api.places(q, near).then((r) => r.results).catch(() => []),
+      ]);
+      const known = mine.map((v) => ({
+        label: v.name,
+        sub: `⌂ ${[v.city, v.country, v.pours ? plural(v.pours, 'pour') : ''].filter(Boolean).join(' · ')}`,
+        raw: { ...v, known: true },
+      }));
+      // Drop world results that are already a known venue by name.
+      const seen = new Set(mine.map((v) => v.name.toLowerCase()));
+      const found = world
+        .filter((p) => !seen.has(p.name.toLowerCase()))
+        .map((p) => ({
+          label: p.name,
+          sub: [p.kind, p.where].filter(Boolean).join(' · '),
+          raw: p,
+        }));
+      return [...known, ...found];
+    },
     (pick) => {
+      const v = pick.raw;
       form.venue.value = pick.label;
-      if (pick.raw.lat != null) {
-        pinned = null;   // it already has a pin; don't overwrite it
-        app.querySelector('#geoState').textContent = 'already pinned on the map';
+      form.venue.dataset.pickedValue = pick.label;
+      if (v.known) {
+        delete form.venue.dataset.city;
+        delete form.venue.dataset.country;
+        setPin(null, v.lat != null ? 'already on the map' : 'no location on this venue yet');
+        return;
       }
+      // A searched place brings its own coordinates and address.
+      setPin({ lat: v.lat, lon: v.lon }, `${v.name}${v.city ? `, ${v.city}` : ''}`);
+      form.venue.dataset.city = v.city || '';
+      form.venue.dataset.country = v.country || '';
     }
   );
 
+  // Still available, for the bar OSM has never heard of.
   app.querySelector('#pin').addEventListener('click', async () => {
-    const state = app.querySelector('#geoState');
-    state.textContent = 'asking your device…';
+    geoState.textContent = 'asking your device…';
     const loc = await askLocation();
     if (!loc) {
-      state.textContent = 'location unavailable — type the venue name instead';
+      setPin(null, 'location unavailable — search for the place instead');
       return;
     }
-    pinned = loc;
-    state.textContent = `pinned at ${loc.lat.toFixed(3)}, ${loc.lon.toFixed(3)}`;
+    setPin(loc, `pinned here: ${loc.lat.toFixed(3)}, ${loc.lon.toFixed(3)}`);
+    near = loc;   // and bias future searches toward it
   });
 
   bindAutocomplete(
@@ -336,6 +394,7 @@ function viewLog() {
     })),
     (pick) => {
       form.brewery.value = pick.label;
+      form.brewery.dataset.pickedValue = pick.label;
       form.brewery.dataset.country = pick.raw.country || '';
       form.brewery.dataset.city = pick.raw.city || '';
       form.brewery.dataset.obdbId = pick.raw.obdbId || '';
@@ -381,7 +440,8 @@ function viewLog() {
         serving: form.serving.value,
         venueName: form.venue.value,
         lat: pinned?.lat, lon: pinned?.lon,
-        venueCity: pinned ? '' : undefined,
+        venueCity: form.venue.dataset.city || '',
+        venueCountry: form.venue.dataset.country || '',
         geoPrivate: app.querySelector('#geoPrivate').checked,
         drunkOn: form.drunkOn.value,
       });
