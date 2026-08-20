@@ -1041,7 +1041,9 @@ async function viewMap() {
 
     <section class="block">
       ${data.venues.length
-        ? `<div class="mapwrap">${svg}</div>`
+        ? `<div class="mapwrap" id="mapwrap"><div id="glmap"></div>
+            <noscript>${svg}</noscript></div>
+           <p class="mapnote" id="mapnote">loading the basemap…</p>`
         : `<div class="empty"><p>No pinned venues yet.</p>
             <p class="hint">Log a beer, tap <strong>Pin this spot</strong>, and it lands here.</p>
             ${state.me ? '<a class="btn btn-amber" href="/log">Log a beer</a>' : ''}</div>`}
@@ -1066,12 +1068,119 @@ async function viewMap() {
     </section>` : ''}
   </div>`;
 
-  // Clicking a dot goes to whoever drank there, when it's a single person.
-  app.querySelector('.pins')?.addEventListener('click', (e) => {
-    const pin = e.target.closest('.pin');
-    if (!pin) return;
-    const v = data.venues.find((x) => x.slug === pin.dataset.slug);
-    if (v?.handles.length === 1) go(`/@${v.handles[0]}`);
+  if (data.venues.length) await drawGlMap(data.venues, svg);
+}
+
+// The real map: MapLibre over our own PMTiles archive. ~1 MB of library, so it
+// is imported only here and only when there is something to show. If any of it
+// fails — old browser, no WebGL, archive unreachable — the hand-rolled SVG world
+// map is swapped in instead, because a broken map is worse than a coarse one.
+async function drawGlMap(venues, svgFallback) {
+  const host = document.getElementById('glmap');
+  const note = document.getElementById('mapnote');
+  const giveUp = (why) => {
+    document.getElementById('mapwrap').innerHTML = svgFallback;
+    if (note) note.textContent = `${why} — showing the simple world map instead.`;
+  };
+  if (!host) return;
+
+  try {
+    if (!window.maplibregl) await loadScript('/assets/vendor/maplibre-gl.js');
+    if (!window.pmtiles) await loadScript('/assets/vendor/pmtiles.js');
+    if (!window.maplibregl || !window.pmtiles) return giveUp('The map library did not load');
+    // MapLibre removed `supported()` in v5, and `maplibregl.supported?.()` there
+    // evaluates to undefined — i.e. always falsy — which silently sent every
+    // visitor to the fallback. Test the actual capability instead.
+    if (!hasWebGl()) return giveUp('This browser cannot draw the map');
+
+    // Teach MapLibre to read pmtiles: URLs, once per page.
+    if (!window.__pmtilesRegistered) {
+      maplibregl.addProtocol('pmtiles', new pmtiles.Protocol().tile);
+      window.__pmtilesRegistered = true;
+    }
+
+    const { style } = await import('./mapstyle.js');
+    const map = new maplibregl.Map({
+      container: host,
+      style: style('world.pmtiles'),
+      // The archive stops at z7; MapLibre keeps drawing past it by scaling the
+      // vectors, which stays sharp — you just stop gaining smaller streets.
+      maxZoom: 15,
+      attributionControl: { compact: true },
+      ...fitTo(venues),
+    });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+    map.on('error', (e) => { if (String(e?.error?.message || '').includes('pmtiles')) giveUp('The basemap failed to load'); });
+
+    // If the map never finishes, don't leave "loading the basemap…" on screen
+    // forever — swap in the SVG. Only start counting once the tab is actually
+    // visible: MapLibre draws on requestAnimationFrame, which browsers freeze in
+    // background tabs, so a hidden tab is stalled rather than broken.
+    let settled = false;
+    const armTimeout = () => setTimeout(() => {
+      if (!settled) giveUp('The map is taking too long');
+    }, 12000);
+    if (document.visibilityState === 'visible') armTimeout();
+    else document.addEventListener('visibilitychange', function once() {
+      if (document.visibilityState !== 'visible') return;
+      document.removeEventListener('visibilitychange', once);
+      armTimeout();
+    });
+
+    map.on('load', () => {
+      settled = true;
+      note?.remove();
+      const max = Math.max(1, ...venues.map((v) => v.pours));
+      for (const v of venues) {
+        const el = document.createElement('button');
+        el.className = 'glpin';
+        el.type = 'button';
+        const size = 12 + 16 * Math.sqrt(v.pours / max);
+        el.style.width = el.style.height = `${size}px`;
+        el.title = `${[v.name, v.city, v.country].filter(Boolean).join(', ')} — ${plural(v.pours, 'pour')}`;
+        el.addEventListener('click', () => {
+          new maplibregl.Popup({ offset: 12, closeButton: false })
+            .setLngLat([v.lon, v.lat])
+            .setHTML(`<strong>${esc(v.name)}</strong>
+              ${v.city || v.country ? `<span>${esc([v.city, v.country].filter(Boolean).join(', '))}</span>` : ''}
+              <span>${plural(v.pours, 'pour')}${v.avg ? ` · ${outOfFive(v.avg)}★ mean` : ''}</span>
+              ${v.handles.length ? `<span>${v.handles.slice(0, 5).map((h) =>
+                `<a href="/@${esc(h)}">@${esc(h)}</a>`).join(' ')}</span>` : ''}`)
+            .addTo(map);
+        });
+        new maplibregl.Marker({ element: el }).setLngLat([v.lon, v.lat]).addTo(map);
+      }
+    });
+  } catch {
+    giveUp('The map could not start');
+  }
+}
+
+// Frame the pins: one venue gets a city-level view, several get their bounding
+// box with room to breathe.
+function fitTo(venues) {
+  if (venues.length === 1) return { center: [venues[0].lon, venues[0].lat], zoom: 6 };
+  const lons = venues.map((v) => v.lon), lats = venues.map((v) => v.lat);
+  return {
+    bounds: [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
+    fitBoundsOptions: { padding: 60, maxZoom: 7 },
+  };
+}
+
+function hasWebGl() {
+  try {
+    const c = document.createElement('canvas');
+    return !!(c.getContext('webgl2') || c.getContext('webgl'));
+  } catch { return false; }
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.async = true;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error(`failed to load ${src}`));
+    document.head.appendChild(s);
   });
 }
 

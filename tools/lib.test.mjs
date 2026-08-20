@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { slugify, clean, isDate, HANDLE_RE, RESERVED } from '../functions/_shared/lib.js';
 import { stars, outOfFive, esc, plural } from '../public/assets/ui.js';
 import { STYLES, STYLE_NAMES, FAMILIES, findStyle } from '../public/assets/styles.js';
@@ -159,4 +160,20 @@ test('place search prefers drinking venues and dedupes', async () => {
   const { LIMITS } = await import('../functions/_shared/ratelimit.js');
   assert.ok(LIMITS.placeSearch, 'the proxied geocoder is rate limited');
   assert.ok(LIMITS.placeSearch.max <= 300, 'and politely so — it is someone else’s free service');
+});
+
+test('map fallback must not hinge on a removed MapLibre API', () => {
+  // maplibregl.supported() was removed in v5, so `maplibregl.supported?.()`
+  // evaluates to undefined — falsy — and sent every visitor to the fallback.
+  // Pin the shape of the mistake so it cannot come back.
+  const fakeMaplibreV5 = {};
+  assert.equal(fakeMaplibreV5.supported?.(), undefined);
+  assert.equal(!fakeMaplibreV5.supported?.(), true, 'optional-call on a removed API is always "unsupported"');
+
+  // Check the guard itself, not prose — the comment explaining this mistake
+  // legitimately names the old API.
+  const src = readFileSync(new URL('../public/assets/app.js', import.meta.url), 'utf8')
+    .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+  assert.ok(!/if\s*\(!\s*maplibregl\.supported/.test(src), 'must not gate on the removed API');
+  assert.ok(src.includes('if (!hasWebGl())'), 'it should test the real capability');
 });

@@ -11,6 +11,10 @@ database_id = "d5c671f0-cd9a-4fce-a83d-33a7a84a5288"
 binding = "PHOTOS"
 bucket_name = "draught-photos"
 
+[[r2_buckets]]
+binding = "TILES"
+bucket_name = "draught-tiles"
+
 # Secrets (set with `npx wrangler pages secret put <NAME>`):
 #   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET
 #   SESSION_SECRET   — 32+ random bytes, base64. `openssl rand -base64 32`

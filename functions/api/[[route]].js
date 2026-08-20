@@ -18,6 +18,7 @@
 //   GET    /api/users/:handle/people?dir=following|followers
 //   POST   /api/upload               raw image bytes -> { key }
 //   GET    /api/img/:key             immutable, year-long cache
+//   GET    /api/tiles/:archive       PMTiles basemap from our own R2, Range-aware
 //   GET    /api/lists                recent lists across everyone
 //   POST   /api/lists                { title, description, ranked }
 //   PATCH  /api/lists/:id            DELETE to remove
@@ -44,6 +45,7 @@ import * as lists from '../_shared/lists.js';
 import { guard, actorOf } from '../_shared/ratelimit.js';
 import * as venues from '../_shared/venues.js';
 import * as places from '../_shared/places.js';
+import * as tiles from '../_shared/tiles.js';
 
 export async function onRequest(context) {
   const { request, env, params } = context;
@@ -154,6 +156,11 @@ export async function onRequest(context) {
       return upload(request, env);
     }
     if (route[0] === 'img' && route[1] && method === 'GET') return servePhoto(route[1], env);
+
+    // The basemap archive. Range requests are the whole point — see tiles.js.
+    if (route[0] === 'tiles' && route[1] && (method === 'GET' || method === 'HEAD')) {
+      return tiles.serve(route[1], request, env);
+    }
 
     // ---- following -------------------------------------------------------
     if (route[0] === 'follow' && route[1] && (method === 'POST' || method === 'DELETE')) {
