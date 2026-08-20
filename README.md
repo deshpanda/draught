@@ -131,8 +131,23 @@ npx wrangler pages project create draught --production-branch=main
 npx wrangler pages deploy --project-name=draught --branch=main
 ```
 
-Then the three secrets. `SESSION_SECRET` is generated and piped so it is
-never displayed:
+#### Finishing sign-in
+
+One self-verifying script sets the Google client secret, redeploys, and checks
+that the live endpoint actually flipped — because "the deploy succeeded" looks
+identical to success even when the secret never landed:
+
+```bash
+./tools/finish-setup.sh
+```
+
+It hides the input, never writes the value to disk or shell history, confirms the
+secret stored rather than trusting the upload, and polls
+`/api/auth/google` until it returns `302`. Safe to re-run.
+`pbpaste | ./tools/finish-setup.sh` works too.
+
+The remaining secrets, done by hand. `SESSION_SECRET` is generated and piped so
+it is never displayed:
 
 ```bash
 openssl rand -base64 32 | npx wrangler pages secret put SESSION_SECRET --project-name=draught
