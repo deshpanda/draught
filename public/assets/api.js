@@ -25,4 +25,33 @@ export const api = {
   profile: (handle) => req(`/users/${encodeURIComponent(handle)}`),
   beer: (brewery, beer) => req(`/beers/${encodeURIComponent(brewery)}/${encodeURIComponent(beer)}`),
   recent: () => req('/recent'),
+  feed: () => req('/feed'),
+
+  follow: (handle) => req(`/follow/${encodeURIComponent(handle)}`, { method: 'POST' }),
+  unfollow: (handle) => req(`/follow/${encodeURIComponent(handle)}`, { method: 'DELETE' }),
+  people: (handle, dir) => req(`/users/${encodeURIComponent(handle)}/people?dir=${dir}`),
+
+  lists: (handle) => req(`/users/${encodeURIComponent(handle)}/lists`),
+  list: (handle, slug) => req(`/users/${encodeURIComponent(handle)}/lists/${encodeURIComponent(slug)}`),
+  recentLists: () => req('/lists'),
+  createList: (body) => req('/lists', { method: 'POST', body }),
+  updateList: (id, body) => req(`/lists/${id}`, { method: 'PATCH', body }),
+  deleteList: (id) => req(`/lists/${id}`, { method: 'DELETE' }),
+  addToList: (id, body) => req(`/lists/${id}/items`, { method: 'POST', body }),
+  removeFromList: (id, beerId) => req(`/lists/${id}/items/${beerId}`, { method: 'DELETE' }),
 };
+
+// Photos go up as raw bytes, not multipart — there's one file and no fields.
+export async function uploadPhoto(blob) {
+  const res = await fetch('/api/upload', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'content-type': blob.type },
+    body: blob,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Upload failed');
+  return data.key;
+}
+
+export const imgUrl = (key) => (key ? `/api/img/${encodeURIComponent(key)}` : null);

@@ -39,7 +39,12 @@ export function blockHead(title, note = '') {
 export function pourRow(p, { who = false, mine = false } = {}) {
   const beerUrl = `/b/${encodeURIComponent(p.brewery_slug)}/${encodeURIComponent(p.beer_slug)}`;
   const bits = [p.style, p.abv ? `${p.abv}%` : '', p.serving, p.venue].filter(Boolean);
-  return `<li>
+  const shot = p.photo_key
+    ? `<a class="thumb" href="${esc(beerUrl)}"><img src="/api/img/${encodeURIComponent(p.photo_key)}"
+        alt="" loading="lazy" decoding="async"></a>`
+    : '';
+  return `<li${shot ? ' class="haspic"' : ''}>
+    ${shot}
     <span class="d">${esc(fmtDate(p.drunk_on))}</span>
     <span class="t">
       <a class="beer" href="${esc(beerUrl)}">${esc(p.beer)}</a>
@@ -135,4 +140,79 @@ export function bindAutocomplete(input, panel, fetcher, onPick) {
 
   input.addEventListener('blur', () => setTimeout(close, 160));
   input.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+}
+
+
+// ---- photos ---------------------------------------------------------------
+
+export const MAX_EDGE = 1400;
+
+// Downscale and re-encode on a canvas before upload. Two reasons: objects stay
+// small (a phone shot goes from ~4 MB to ~250 KB), and re-encoding **drops all
+// EXIF** — including the GPS coordinates most phones bury in every photo. That
+// matters here: a label shot geotagged to someone's home is not something a
+// public beer log should be quietly publishing.
+export async function prepPhoto(file) {
+  if (!file.type.startsWith('image/')) throw new Error('That is not an image.');
+  if (file.size > 25_000_000) throw new Error('That photo is enormous — under 25 MB please.');
+
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+  const w = Math.round(bitmap.width * scale);
+  const h = Math.round(bitmap.height * scale);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+  bitmap.close?.();
+
+  const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.82));
+  if (!blob) throw new Error('Could not read that photo.');
+  return { blob, width: w, height: h };
+}
+
+export const photoImg = (key, cls = '') =>
+  key ? `<img class="${cls}" src="/api/img/${encodeURIComponent(key)}" alt="" loading="lazy" decoding="async">` : '';
+
+// ---- follow button --------------------------------------------------------
+
+export function followBtn(handle, following) {
+  return `<button class="btn ${following ? '' : 'btn-amber'}" id="followBtn"
+    data-handle="${esc(handle)}" data-following="${following ? '1' : '0'}">${
+    following ? 'Following' : 'Follow'
+  }</button>`;
+}
+
+export function bindFollow(root, api, onChange) {
+  const btn = root.querySelector('#followBtn');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    const on = btn.dataset.following === '1';
+    btn.disabled = true;
+    try {
+      const res = on ? await api.unfollow(btn.dataset.handle) : await api.follow(btn.dataset.handle);
+      btn.dataset.following = on ? '0' : '1';
+      btn.textContent = on ? 'Follow' : 'Following';
+      btn.classList.toggle('btn-amber', on);
+      onChange?.(res);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
+// ---- list card ------------------------------------------------------------
+
+export function listCard(l, handle) {
+  const href = `/@${encodeURIComponent(handle)}/list/${encodeURIComponent(l.slug)}`;
+  return `<a class="lcard" href="${esc(href)}">
+    <span class="lcover">${l.cover ? photoImg(l.cover) : '<span class="lcover-none">▤</span>'}</span>
+    <span class="lmeta">
+      <span class="lt">${esc(l.title)}${l.ranked ? '<span class="rank">ranked</span>' : ''}</span>
+      <span class="ln">${plural(l.items ?? 0, 'beer')}</span>
+      ${l.description ? `<span class="ld">${esc(l.description)}</span>` : ''}
+    </span>
+  </a>`;
 }

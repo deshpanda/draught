@@ -32,11 +32,15 @@ Draught takes that axis:
 
 | Route | What's there |
 | --- | --- |
-| `/` | Signed out: the pitch. Signed in: straight to your shelf |
-| `/log` | The one form that matters — brewery, beer, style, half-stars, notes |
-| `/@handle` | A drinker's shelf: totals, the styles they drink, the full ledger |
-| `/b/:brewery/:beer` | A beer's page: mean rating, the ratings histogram, the margins |
-| `/recent` | The bar — the last forty pours logged |
+| `/` | Signed out: the pitch. Signed in: your feed |
+| `/feed` | Your table — pours from the people you follow, and your own |
+| `/log` | The one form that matters — brewery, beer, style, half-stars, photo, notes |
+| `/@handle` | A drinker's shelf: totals, the wall of their photos, styles, the full ledger |
+| `/@handle/lists` · `/@handle/list/:slug` | Their lists, and one list in full |
+| `/@handle/followers` · `/following` | Who's at whose table |
+| `/b/:brewery/:beer` | A beer's page: hero photo, mean rating, histogram, the margins |
+| `/recent` | The bar — the last forty pours logged, by anyone |
+| `/lists` | The library — lists from across Draught |
 | `/settings` | Display name and bio |
 
 ## Architecture
@@ -46,18 +50,20 @@ Three moving parts, all on free tiers, none of which sleep.
 ```
 browser (SPA, no framework)
       │  same-origin fetch, HttpOnly session cookie
+      │  photos downscaled on a canvas before upload
       ▼
 Cloudflare Pages Functions  ──▶  Open Brewery DB (brewery lookup)
-      │
-      ▼
-Cloudflare D1 (SQLite)
+      │           │
+      ▼           ▼
+     D1        R2 bucket
+   (SQLite)    (label photos)
 ```
 
 - **Frontend** — hand-rolled ES modules on Cloudflare Pages. No build step, no
   dependencies, no bundler. `public/` is the deployable artefact as-is.
 - **API** — one catch-all Pages Function, `functions/api/[[route]].js`. OAuth
   against Google, opaque session tokens hashed into D1.
-- **Data** — D1. Five tables; a pour is a row.
+- **Data** — D1. Eight tables; a pour is a row. Label photos live in R2.
 
 The API lives on the same origin as the page, so the session is an
 `HttpOnly; SameSite=Lax` cookie rather than a token in `localStorage`, and there
@@ -77,6 +83,9 @@ hold your data. Being straight about what that means:
 - There are **no analytics, no trackers and no third-party scripts**. The only
   outbound call is a brewery-name lookup against Open Brewery DB, which sees a
   search string and no user identity.
+- **Photos are re-encoded in your browser before upload**, which strips EXIF —
+  including the GPS coordinates phones bury in every shot. A label photo taken
+  at home does not quietly publish your address.
 - Sessions are opaque 256-bit tokens; only their hashes are stored.
 
 ## Running it
@@ -130,9 +139,11 @@ door. `/api/auth/dev` 404s unless the flag is present.
 npm test
 ```
 
-Ten tests over the pure parts: slug collision (the rule that decides when two
+Eleven tests over the pure parts: slug collision (the rule that decides when two
 people have logged the same beer), input cleaning, handle validation, half-star
-rendering, HTML escaping, and the integrity of the style canon.
+rendering, HTML escaping, the integrity of the style canon, and a pinned regression for the link
+interceptor (a valueless `data-raw` attribute is `""`, so guarding on its
+truthiness silently swallowed every `/api/` navigation — including sign-in).
 
 ## Non-goals
 

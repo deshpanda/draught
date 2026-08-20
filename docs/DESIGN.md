@@ -98,6 +98,23 @@ erDiagram
 Ratings are stored doubled so the whole system stays in integers; `outOfFive()`
 is the only place halving happens.
 
+| Table | Key facts |
+| --- | --- |
+| `follows` | `PRIMARY KEY (follower_id, followee_id)` makes a double-follow a no-op; index on `followee_id` because "who follows me" is as hot as "who do I follow". |
+| `lists` | `UNIQUE (user_id, slug)`. A repeated title takes `-2`, `-3`… rather than erroring — naming two lists the same thing is a mistake, not a conflict. |
+| `list_items` | `PRIMARY KEY (list_id, beer_id)` so a beer can't appear twice; `position` drives ranked display. |
+| photos | `pours.photo_key` is the drinker's shot; `beers.photo_key` is the one representing the beer. First upload wins the role, guarded by `WHERE photo_key IS NULL` so concurrent first-pours can't race. |
+
+**Deleting a pour is the subtle one.** If its photo is also the beer's
+representative shot, dropping the R2 object would leave a broken image on a page
+that isn't the deleter's. So the role is handed to another drinker's photo first,
+and the object is only binned once no pour *and* no beer points at it.
+
+**Photos never reach R2 unprocessed.** The client draws them onto a canvas at
+1400 px max edge and re-encodes as JPEG. That halves storage *and* strips EXIF —
+GPS included. Server-side we still check the declared type against the file's
+magic numbers, because a client is never the boundary.
+
 ## LLD — the API
 
 One catch-all, `functions/api/[[route]].js`, dispatching on a path array.

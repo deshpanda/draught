@@ -7,6 +7,10 @@ binding = "DB"
 database_name = "draught"
 database_id = "d5c671f0-cd9a-4fce-a83d-33a7a84a5288"
 
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "draught-photos"
+
 # Secrets (set with `npx wrangler pages secret put <NAME>`):
 #   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET
 #   SESSION_SECRET   — 32+ random bytes, base64. `openssl rand -base64 32`

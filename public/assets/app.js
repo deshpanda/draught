@@ -1,10 +1,11 @@
 // Draught — the whole client. History routing, seven views, no framework.
 
-import { api } from './api.js';
+import { api, uploadPhoto, imgUrl } from './api.js';
 import { STYLES, FAMILIES, findStyle } from './styles.js';
 import {
   esc, stars, outOfFive, fmtDate, today, plural,
   tile, blockHead, pourRow, starRail, bindStarRail, bindAutocomplete,
+  prepPhoto, photoImg, followBtn, bindFollow, listCard,
 } from './ui.js';
 
 const app = document.getElementById('app');
@@ -21,7 +22,17 @@ function parse(pathname) {
   if (path === '/welcome') return { view: 'welcome' };
   if (path === '/log') return { view: 'log' };
   if (path === '/recent') return { view: 'recent' };
+  if (path === '/feed') return { view: 'feed' };
+  if (path === '/lists') return { view: 'allLists' };
   if (path === '/settings') return { view: 'settings' };
+
+  const list = path.match(/^\/@([^/]+)\/list\/([^/]+)$/);
+  if (list) return { view: 'list', handle: list[1].toLowerCase(), slug: list[2] };
+  const userLists = path.match(/^\/@([^/]+)\/lists$/);
+  if (userLists) return { view: 'userLists', handle: userLists[1].toLowerCase() };
+  const folk = path.match(/^\/@([^/]+)\/(followers|following)$/);
+  if (folk) return { view: 'people', handle: folk[1].toLowerCase(), dir: folk[2] };
+
   if (path.startsWith('/@')) return { view: 'profile', handle: path.slice(2).toLowerCase() };
   const beer = path.match(/^\/b\/([^/]+)\/([^/]+)$/);
   if (beer) return { view: 'beer', brewery: beer[1], beer: beer[2] };
@@ -37,7 +48,10 @@ export function go(href, { replace = false } = {}) {
 // Intercept in-app links so the SPA never reloads.
 document.addEventListener('click', (e) => {
   const a = e.target.closest('a[href^="/"]');
-  if (!a || a.target === '_blank' || e.metaKey || e.ctrlKey || e.shiftKey || a.dataset.raw) return;
+  if (!a || a.target === '_blank' || e.metaKey || e.ctrlKey || e.shiftKey) return;
+  // `data-raw` is valueless, so dataset.raw is "" — check the attribute, not its
+  // truthiness. Anything under /api/ is a real navigation whatever it's marked.
+  if (a.hasAttribute('data-raw') || a.getAttribute('href').startsWith('/api/')) return;
   e.preventDefault();
   if (a.getAttribute('href') !== location.pathname) go(a.getAttribute('href'));
 });
@@ -49,13 +63,16 @@ function renderNav() {
   const here = location.pathname;
   const on = (p) => (here === p ? ' class="on"' : '');
   if (!state.me) {
-    nav.innerHTML = `<a href="/recent"${on('/recent')}>Recent</a>
+    nav.innerHTML = `<a href="/recent"${on('/recent')}>Bar</a>
+      <a href="/lists"${on('/lists')}>Lists</a>
       <a class="cta" href="/api/auth/google" data-raw>Sign in</a>`;
     return;
   }
   const h = state.me.handle;
   nav.innerHTML = `
-    <a href="/recent"${on('/recent')}>Recent</a>
+    <a href="/feed"${on('/feed')}>Feed</a>
+    <a href="/recent"${on('/recent')}>Bar</a>
+    <a href="/lists"${on('/lists')}>Lists</a>
     ${h ? `<a href="/@${esc(h)}"${on(`/@${h}`)}>Your shelf</a>` : ''}
     <a href="/settings"${on('/settings')}>Settings</a>
     <button id="signout">Sign out</button>
@@ -106,7 +123,7 @@ function viewLanding() {
 async function viewHome() {
   if (!state.me) return viewLanding();
   if (!state.me.handle) return go('/welcome', { replace: true });
-  return go(`/@${state.me.handle}`, { replace: true });
+  return go('/feed', { replace: true });
 }
 
 function viewWelcome() {
@@ -195,6 +212,13 @@ function viewLog() {
           <p class="hint">Optional — logging without a rating is fine.</p>
         </div>
         <div class="field">
+          <label for="photo">Photo</label>
+          <input id="photo" name="photo" type="file" accept="image/*" capture="environment">
+          <div id="shot" class="shot"></div>
+          <p class="hint" id="photoHint">Optional. Resized in your browser before upload — which also
+            strips the location data your phone hides in the file.</p>
+        </div>
+        <div class="field">
           <label for="note">Notes</label>
           <textarea id="note" name="note" maxlength="2000"
             placeholder="What did it taste like? Would you have it again?"></textarea>
@@ -224,6 +248,28 @@ function viewLog() {
   const form = app.querySelector('#pform');
   const msg = app.querySelector('#msg');
   bindStarRail(app);
+
+  // Prepare (and upload) the photo as soon as it's chosen, so submitting the
+  // form is instant rather than waiting on a phone-sized file.
+  let photoKey = null;
+  const shot = app.querySelector('#shot');
+  const photoHint = app.querySelector('#photoHint');
+  form.photo.addEventListener('change', async () => {
+    const file = form.photo.files?.[0];
+    photoKey = null; shot.innerHTML = '';
+    if (!file) return;
+    photoHint.textContent = 'preparing…';
+    try {
+      const { blob, width, height } = await prepPhoto(file);
+      shot.innerHTML = `<img src="${URL.createObjectURL(blob)}" alt="">`;
+      photoHint.textContent = `uploading… (${width}×${height}, ${Math.round(blob.size / 1024)} KB)`;
+      photoKey = await uploadPhoto(blob);
+      photoHint.textContent = 'photo ready — EXIF stripped.';
+    } catch (err) {
+      photoHint.textContent = err.message;
+      form.photo.value = '';
+    }
+  });
 
   // Style choice suggests the ABV band, but never overwrites a typed value.
   const styleSel = form.style;
@@ -283,6 +329,7 @@ function viewLog() {
         style: styleSel.value,
         abv: abv.value,
         rating: form.rating.value,
+        photoKey,
         note: form.note.value,
         serving: form.serving.value,
         venue: form.venue.value,
@@ -303,8 +350,8 @@ async function viewProfile(handle) {
   loading();
   let data;
   try { data = await api.profile(handle); } catch (err) { return oops(err.message); }
-  const { user, stats, styles, pours } = data;
-  const mine = state.me?.handle === user.handle;
+  const { user, stats, styles, pours, viewerFollows } = data;
+  const mine = data.isSelf || state.me?.handle === user.handle;
 
   const avatar = user.avatar
     ? `<img src="${esc(user.avatar)}" alt="" referrerpolicy="no-referrer">`
@@ -317,7 +364,17 @@ async function viewProfile(handle) {
         <h2>${esc(user.name || user.handle)}</h2>
         <span class="at">@${esc(user.handle)}</span>
         ${user.bio ? `<p class="bio">${esc(user.bio)}</p>` : ''}
+        <p class="social">
+          <a href="/@${esc(user.handle)}/followers">${plural(stats.followers ?? 0, 'follower')}</a>
+          · <a href="/@${esc(user.handle)}/following">${stats.following ?? 0} following</a>
+          · <a href="/@${esc(user.handle)}/lists">${plural(stats.lists ?? 0, 'list')}</a>
+        </p>
       </div>
+      <span class="phead-act">
+        ${mine
+          ? '<a class="btn" href="/settings">Edit profile</a>'
+          : (state.me ? followBtn(user.handle, viewerFollows) : '')}
+      </span>
     </section>
 
     <div class="tiles">
@@ -327,6 +384,13 @@ async function viewProfile(handle) {
       ${tile('styles', stats.styles ?? 0)}
       ${tile('mean rating', stats.avg ? `${outOfFive(stats.avg)}★` : '—', stats.avg ? 'of five' : 'nothing rated yet')}
     </div>
+
+    ${pours.some((p) => p.photo_key) ? `<section class="block">
+      ${blockHead('the wall', 'what they poured')}
+      <div class="wall">${pours.filter((p) => p.photo_key).slice(0, 24).map((p) =>
+        `<a class="wtile" href="/b/${encodeURIComponent(p.brewery_slug)}/${encodeURIComponent(p.beer_slug)}"
+          title="${esc(p.beer)} — ${esc(p.brewery)}">${photoImg(p.photo_key)}</a>`).join('')}</div>
+    </section>` : ''}
 
     ${styles.length ? `<section class="block">
       ${blockHead('the styles they drink', `${styles.length} of 117`)}
@@ -341,6 +405,11 @@ async function viewProfile(handle) {
             ${mine ? '<a class="btn btn-amber" href="/log">Log your first beer</a>' : ''}</div>`}
     </section>
   </div>`;
+
+  bindFollow(app, api, (res) => {
+    const el = app.querySelector('.social a');
+    if (el) el.textContent = plural(res.followers, 'follower');
+  });
 
   if (mine) {
     app.querySelector('#ledger')?.addEventListener('click', async (e) => {
@@ -367,6 +436,7 @@ async function viewBeer(brewerySlug, beerSlug) {
   const style = findStyle(beer.style);
 
   app.innerHTML = `<div class="wrap">
+    ${beer.photoKey ? `<div class="hero-shot">${photoImg(beer.photoKey)}</div>` : ''}
     <section class="hero">
       <p class="kicker">${esc(beer.brewery)}${beer.country ? ` · ${esc(beer.country)}` : ''}</p>
       <h2>${esc(beer.name)}</h2>
@@ -400,8 +470,59 @@ async function viewBeer(brewerySlug, beerSlug) {
         : '<div class="empty"><p>Nobody has written anything down yet.</p></div>'}
     </section>
 
-    ${state.me ? `<a class="btn btn-amber" href="/log">Log this beer</a>` : ''}
+    <div class="beer-acts">
+      ${state.me ? `<a class="btn btn-amber" href="/log">Log this beer</a>` : ''}
+      ${state.me?.handle ? '<button class="btn" id="addList">Add to a list</button>' : ''}
+    </div>
+    <div id="listPicker"></div>
   </div>`;
+
+  app.querySelector('#addList')?.addEventListener('click', () =>
+    openListPicker(app.querySelector('#listPicker'), beer));
+}
+
+// Pick an existing list or make one on the spot — a beer you want to remember
+// shouldn't require a detour through another page first.
+async function openListPicker(host, beer) {
+  host.innerHTML = '<p class="loading">fetching your lists…</p>';
+  let mine = [];
+  try { mine = (await api.lists(state.me.handle)).lists; } catch { /* new drinker, no lists */ }
+
+  host.innerHTML = `<div class="panel picker">
+    <h4>Add “${esc(beer.name)}” to</h4>
+    ${mine.length ? `<div class="chips">${mine.map((l) =>
+      `<button class="chip" data-list="${l.id}">${esc(l.title)}<span class="n">${l.items}</span></button>`
+    ).join('')}</div>` : '<p class="hint">No lists yet — name one below.</p>'}
+    <form id="newList" class="picker-new">
+      <input id="ltitle" placeholder="New list — e.g. Best stouts of 2026" maxlength="80" required>
+      <button class="btn btn-amber" type="submit">Create &amp; add</button>
+    </form>
+    <p class="msg" id="pmsg"></p>
+  </div>`;
+
+  const pmsg = host.querySelector('#pmsg');
+  const attach = async (listId) => {
+    pmsg.className = 'msg'; pmsg.textContent = 'adding…';
+    try {
+      await api.addToList(listId, { brewerySlug: beer.brewerySlug, beerSlug: beer.slug });
+      pmsg.className = 'msg ok'; pmsg.textContent = 'added.';
+    } catch (err) { pmsg.className = 'msg err'; pmsg.textContent = err.message; }
+  };
+
+  host.querySelector('.chips')?.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-list]');
+    if (b) attach(Number(b.dataset.list));
+  });
+  host.querySelector('#newList').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const title = host.querySelector('#ltitle').value.trim();
+    if (!title) return;
+    pmsg.className = 'msg'; pmsg.textContent = 'creating…';
+    try {
+      const list = await api.createList({ title });
+      await attach(list.id);
+    } catch (err) { pmsg.className = 'msg err'; pmsg.textContent = err.message; }
+  });
 }
 
 async function viewRecent() {
@@ -462,6 +583,168 @@ function viewSettings() {
   });
 }
 
+async function viewFeed() {
+  if (!state.me) return viewLanding();
+  if (!state.me.handle) return go('/welcome', { replace: true });
+  loading();
+  let data;
+  try { data = await api.feed(); } catch (err) { return oops(err.message); }
+
+  const empty = !data.pours.length;
+  app.innerHTML = `<div class="wrap">
+    <section class="hero"><p class="kicker">your table</p>
+      <h2>What you and yours are <em>drinking</em></h2>
+      <p>${data.following
+        ? `Pours from the ${plural(data.following, 'person', 'people')} you follow, and your own.`
+        : 'Follow a few drinkers and their pours land here.'}</p></section>
+    <section class="block">
+      ${empty
+        ? `<div class="empty">
+            <p>${data.following ? 'Nothing new from your table yet.' : 'You are not following anyone yet.'}</p>
+            <a class="btn btn-amber" href="/recent">Find people at the bar</a>
+            <a class="btn" href="/log">Log a beer</a>
+          </div>`
+        : `<ul class="pours">${data.pours.map((p) => pourRow(p, { who: true })).join('')}</ul>`}
+    </section>
+  </div>`;
+}
+
+async function viewPeople(handle, dir) {
+  loading();
+  let data;
+  try { data = await api.people(handle, dir); } catch (err) { return oops(err.message); }
+  app.innerHTML = `<div class="wrap">
+    <section class="hero"><p class="kicker">@${esc(handle)}</p>
+      <h2>${dir === 'followers' ? 'Followers' : '<em>Following</em>'}</h2></section>
+    <section class="block">
+      ${data.people.length
+        ? `<div class="folk">${data.people.map((u) => `
+            <a class="fcard" href="/@${esc(u.handle)}">
+              ${u.avatar
+                ? `<img src="${esc(u.avatar)}" alt="" referrerpolicy="no-referrer">`
+                : '<img src="/assets/favicon.svg" alt="">'}
+              <span><span class="fn">${esc(u.name || u.handle)}</span>
+              <span class="fh">@${esc(u.handle)}</span></span>
+            </a>`).join('')}</div>`
+        : `<div class="empty"><p>Nobody yet.</p></div>`}
+    </section>
+  </div>`;
+}
+
+async function viewUserLists(handle) {
+  loading();
+  let data;
+  try { data = await api.lists(handle); } catch (err) { return oops(err.message); }
+  const mine = state.me?.handle === data.handle;
+
+  app.innerHTML = `<div class="wrap">
+    <section class="hero"><p class="kicker">@${esc(data.handle)}</p>
+      <h2>${mine ? 'Your <em>lists</em>' : 'Lists'}</h2></section>
+    ${mine ? `<section class="block"><form id="newList" class="picker-new">
+        <input id="ltitle" placeholder="New list — e.g. Best stouts of 2026" maxlength="80" required>
+        <label class="rank-toggle"><input type="checkbox" id="lranked"> ranked</label>
+        <button class="btn btn-amber" type="submit">Create</button>
+      </form><p class="msg" id="msg"></p></section>` : ''}
+    <section class="block">
+      ${data.lists.length
+        ? `<div class="lists">${data.lists.map((l) => listCard(l, data.handle)).join('')}</div>`
+        : `<div class="empty"><p>${mine ? 'No lists yet.' : 'No lists here.'}</p></div>`}
+    </section>
+  </div>`;
+
+  app.querySelector('#newList')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = app.querySelector('#msg');
+    msg.className = 'msg'; msg.textContent = 'creating…';
+    try {
+      const list = await api.createList({
+        title: app.querySelector('#ltitle').value,
+        ranked: app.querySelector('#lranked').checked,
+      });
+      go(`/@${data.handle}/list/${list.slug}`);
+    } catch (err) { msg.className = 'msg err'; msg.textContent = err.message; }
+  });
+}
+
+async function viewList(handle, slug) {
+  loading();
+  let data;
+  try { data = await api.list(handle, slug); } catch (err) { return oops(err.message); }
+  const { list, items } = data;
+  const mine = state.me?.handle === list.owner.handle;
+
+  app.innerHTML = `<div class="wrap">
+    <section class="hero">
+      <p class="kicker"><a href="/@${esc(list.owner.handle)}">@${esc(list.owner.handle)}</a>${
+        list.ranked ? ' · ranked' : ''}</p>
+      <h2>${esc(list.title)}</h2>
+      ${list.description ? `<p>${esc(list.description)}</p>` : ''}
+    </section>
+    <section class="block">
+      ${blockHead('the list', plural(items.length, 'beer'))}
+      ${items.length
+        ? `<ol class="litems${list.ranked ? ' ranked' : ''}" id="litems">${items.map((it, i) => `
+            <li>
+              ${list.ranked ? `<span class="pos">${i + 1}</span>` : ''}
+              <a class="ithumb" href="/b/${encodeURIComponent(it.brewery_slug)}/${encodeURIComponent(it.beer_slug)}">${
+                it.photo_key ? photoImg(it.photo_key) : '<span class="ithumb-none">▤</span>'}</a>
+              <span class="it">
+                <a class="beer" href="/b/${encodeURIComponent(it.brewery_slug)}/${encodeURIComponent(it.beer_slug)}">${esc(it.beer)}</a>
+                <span class="by">· ${esc(it.brewery)}</span>
+                <span class="meta">${esc([it.style, it.abv ? `${it.abv}%` : ''].filter(Boolean).join(' · '))}</span>
+                ${it.note ? `<span class="inote">${esc(it.note)}</span>` : ''}
+              </span>
+              <span class="r"><span class="stars">${stars(it.avg ? Math.round(it.avg) : null)}</span>
+              ${mine ? `<button class="kill" data-drop="${it.beer_id}">remove</button>` : ''}</span>
+            </li>`).join('')}</ol>`
+        : `<div class="empty"><p>Nothing on this list yet.</p>
+            ${mine ? '<p class="hint">Open any beer and choose “Add to a list”.</p>' : ''}</div>`}
+    </section>
+    ${mine ? `<button class="btn" id="delList">Delete this list</button>` : ''}
+  </div>`;
+
+  if (!mine) return;
+  app.querySelector('#litems')?.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-drop]');
+    if (!btn) return;
+    btn.disabled = true;
+    try {
+      await api.removeFromList(list.id, btn.dataset.drop);
+      btn.closest('li').remove();
+    } catch { btn.disabled = false; }
+  });
+  app.querySelector('#delList')?.addEventListener('click', async () => {
+    if (!confirm(`Delete “${list.title}”? The beers stay, the list goes.`)) return;
+    try {
+      await api.deleteList(list.id);
+      go(`/@${list.owner.handle}/lists`);
+    } catch (err) { alert(err.message); }
+  });
+}
+
+async function viewAllLists() {
+  loading();
+  let data;
+  try { data = await api.recentLists(); } catch (err) { return oops(err.message); }
+  app.innerHTML = `<div class="wrap">
+    <section class="hero"><p class="kicker">the library</p>
+      <h2>Lists people are <em>keeping</em></h2>
+      <p>Collections and rankings from across Draught.</p></section>
+    <section class="block">
+      ${data.lists.length
+        ? `<div class="lists">${data.lists.map((l) => `
+            <a class="lcard" href="/@${esc(l.handle)}/list/${esc(l.slug)}">
+              <span class="lcover"><span class="lcover-none">▤</span></span>
+              <span class="lmeta">
+                <span class="lt">${esc(l.title)}${l.ranked ? '<span class="rank">ranked</span>' : ''}</span>
+                <span class="ln">${plural(l.items, 'beer')} · @${esc(l.handle)}</span>
+              </span></a>`).join('')}</div>`
+        : `<div class="empty"><p>No lists yet. Make the first one.</p>
+            ${state.me?.handle ? `<a class="btn btn-amber" href="/@${esc(state.me.handle)}/lists">Start a list</a>` : ''}</div>`}
+    </section>
+  </div>`;
+}
+
 // ---- boot ------------------------------------------------------------------
 
 function render() {
@@ -476,6 +759,11 @@ function render() {
     case 'settings': return viewSettings();
     case 'profile': return viewProfile(r.handle);
     case 'beer': return viewBeer(r.brewery, r.beer);
+    case 'feed': return viewFeed();
+    case 'people': return viewPeople(r.handle, r.dir);
+    case 'userLists': return viewUserLists(r.handle);
+    case 'list': return viewList(r.handle, r.slug);
+    case 'allLists': return viewAllLists();
     default: return oops('There is nothing at that address.');
   }
 }

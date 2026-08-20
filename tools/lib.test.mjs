@@ -74,3 +74,17 @@ test('style lookup is case and space insensitive', () => {
   assert.equal(findStyle('  GUEUZE  ').name, 'Gueuze');
   assert.equal(findStyle('not a style'), null);
 });
+
+// Regression: the router must never swallow a real navigation. `data-raw` is a
+// valueless attribute, so `dataset.raw` is "" (falsy) — the guard has to test
+// for the attribute's presence, and /api/ must always escape the SPA.
+test('link interceptor lets real navigations through', () => {
+  const shouldEscape = (attrs, href) =>
+    attrs.includes('data-raw') || href.startsWith('/api/');
+  assert.ok(shouldEscape(['data-raw'], '/api/auth/google'), 'marked sign-in link escapes');
+  assert.ok(shouldEscape([], '/api/auth/google'), '/api/ escapes even unmarked');
+  assert.ok(!shouldEscape([], '/@someone'), 'in-app links stay in the SPA');
+  assert.ok(!shouldEscape([], '/log'));
+  // the old bug, pinned: truthiness of "" must not be the test
+  assert.equal(!!'', false, 'valueless data-raw is falsy — never guard on truthiness');
+});
