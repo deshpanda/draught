@@ -115,7 +115,7 @@ export async function onRequest(context) {
          JOIN breweries br ON br.id = b.brewery_id
          JOIN users u ON u.id = p.user_id
          WHERE u.handle IS NOT NULL
-         ORDER BY p.drunk_on DESC, p.created_at DESC LIMIT 40`
+         ORDER BY p.drunk_on DESC, p.id DESC LIMIT 40`
       ).all();
       return json({ pours: results });
     }
@@ -249,7 +249,7 @@ async function beerPage(env, brewerySlug, beerSlug) {
       `SELECT p.rating, p.note, p.drunk_on, p.serving, u.handle, u.name AS drinker, u.avatar
        FROM pours p JOIN users u ON u.id = p.user_id
        WHERE p.beer_id = ? AND u.handle IS NOT NULL
-       ORDER BY (p.note != '') DESC, p.created_at DESC LIMIT 50`
+       ORDER BY (p.note != '') DESC, p.drunk_on DESC, p.id DESC LIMIT 50`
     ).bind(beer.id).all(),
   ]);
 
