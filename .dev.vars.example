@@ -2,7 +2,5 @@
 SESSION_SECRET=dev-only-secret-change-me-0000000000000000
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
 # with no OAuth creds set, /api/auth/dev works locally so you can build offline
 DEV_LOGIN=1

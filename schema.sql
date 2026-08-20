@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
   name        TEXT NOT NULL DEFAULT '',
   avatar      TEXT NOT NULL DEFAULT '',
   bio         TEXT NOT NULL DEFAULT '',
-  provider    TEXT NOT NULL,             -- 'google' | 'github'
+  provider    TEXT NOT NULL,             -- 'google' (or 'dev' locally)
   provider_id TEXT NOT NULL,
   created_at  INTEGER NOT NULL,
   UNIQUE (provider, provider_id)

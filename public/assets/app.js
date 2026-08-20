@@ -83,8 +83,7 @@ function viewLanding() {
     <p class="pitch">Log the beer you drink. Rate it, remember it, and watch your
       taste take shape — the beers, the breweries, the styles you keep coming back to.</p>
     <div class="signin">
-      <a class="btn btn-amber btn-lg" href="/api/auth/google" data-raw>Sign in with Google</a>
-      <a class="btn btn-lg" href="/api/auth/github" data-raw>Sign in with GitHub</a>
+      <a class="btn btn-amber btn-lg" href="/api/auth/google" data-raw>Continue with Google</a>
     </div>
     ${isLocal ? '<p class="fine"><a href="/api/auth/dev?as=Local%20Drinker" data-raw>dev sign-in</a> (localhost only)</p>' : ''}
     <p class="fine">Free. No ads, no badges, no streaks to keep.<br>

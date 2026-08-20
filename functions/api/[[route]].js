@@ -321,19 +321,6 @@ const PROVIDERS = {
       return { id: p.sub, name: p.name || p.given_name || 'Someone', avatar: p.picture || '' };
     },
   },
-  github: {
-    authorize: 'https://github.com/login/oauth/authorize',
-    token: 'https://github.com/login/oauth/access_token',
-    scope: 'read:user',
-    async profile(accessToken) {
-      const r = await fetch('https://api.github.com/user', {
-        headers: { authorization: `Bearer ${accessToken}`, 'user-agent': 'draught', accept: 'application/vnd.github+json' },
-      });
-      if (!r.ok) throw bad('GitHub would not say who you are.', 502);
-      const p = await r.json();
-      return { id: String(p.id), name: p.name || p.login, avatar: p.avatar_url || '' };
-    },
-  },
 };
 
 function creds(env, provider) {

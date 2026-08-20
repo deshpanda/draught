@@ -17,7 +17,7 @@ flowchart LR
         D[(D1<br/>SQLite)]
     end
     OBDB[Open Brewery DB<br/>public, keyless]
-    G[Google / GitHub<br/>OAuth]
+    G[Google<br/>OAuth]
 
     SPA -->|GET /| P
     SPA -->|fetch /api/* same-origin| F
@@ -105,7 +105,7 @@ One catch-all, `functions/api/[[route]].js`, dispatching on a path array.
 | Route | Auth | Notes |
 | --- | --- | --- |
 | `GET /api/me` | cookie | returns `needsHandle` so the client can route to `/welcome` |
-| `GET /api/auth/:provider` | — | sets a 10-minute state nonce cookie, redirects to the provider |
+| `GET /api/auth/google` | — | sets a 10-minute state nonce cookie, redirects to Google |
 | `GET /api/auth/:provider/callback` | state cookie | constant-time state compare, code exchange, session |
 | `GET /api/auth/dev` | `DEV_LOGIN=1` | local-only; 404 otherwise |
 | `POST /api/logout` | cookie | deletes the session row and clears the cookie |

@@ -54,7 +54,7 @@ Cloudflare D1 (SQLite)
 - **Frontend** — hand-rolled ES modules on Cloudflare Pages. No build step, no
   dependencies, no bundler. `public/` is the deployable artefact as-is.
 - **API** — one catch-all Pages Function, `functions/api/[[route]].js`. OAuth
-  against Google and GitHub, opaque session tokens hashed into D1.
+  against Google, opaque session tokens hashed into D1.
 - **Data** — D1. Five tables; a pour is a row.
 
 The API lives on the same origin as the page, so the session is an
@@ -99,15 +99,14 @@ npm run db:remote
 npx wrangler pages deploy
 ```
 
-Then set the secrets — `SESSION_SECRET` (`openssl rand -base64 32`) plus the
-Google and GitHub client id/secret pairs:
+Then set the secrets — `SESSION_SECRET` plus the Google client id and secret:
 
 ```bash
 npx wrangler pages secret put SESSION_SECRET
 ```
 
-OAuth callback URLs are `https://<your-domain>/api/auth/google/callback` and
-`.../github/callback`.
+The OAuth callback URL is `https://<your-domain>/api/auth/google/callback`.
+Sign-in is Google-only by design — one button, no provider chooser.
 
 ## Tests
 
