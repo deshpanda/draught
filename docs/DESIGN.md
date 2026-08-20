@@ -163,12 +163,37 @@ right. Hover previews, click commits to a hidden input.
 with a sequence number, so a slow early request can never overwrite the results
 of a later keystroke.
 
-## Design language
+## The look
 
-Inherited from Matinée, because a projector lamp and a pint are the same colour:
-`--amber: #e6a648` on `--bg: #0e0c09`, mono uppercase letterspaced labels
-against a heavy condensed display face, one accent and no second hue. The film
-grain becomes condensation on a cold glass. No web fonts.
+**Two Inks on Ivory** — a drinks journal rather than a dashboard. Ivory stock
+`#F5F0E6`, ink `#191510`, one second plate in tobacco amber `#8A5314`, and a dark
+variant that inverts the same relationships. Measured, not eyeballed: body text
+7.42:1, headings 15.99:1, ivory on the amber button 5.56:1.
+
+Everything is **EB Garamond** — roman, italic and spaced caps from one family,
+which is what makes a page look *set* rather than assembled. There is no sans and
+no mono outside `<code>`. Small caps are faux (uppercase plus tracking) so they
+render identically if the font files never arrive; with `font-display: swap` the
+fallback is a real old-style serif on every OS.
+
+Three decisions worth keeping:
+
+- **Rules, not boxes.** `border-radius: 0` everywhere except a person's face.
+  Five rounded rectangles read as a dashboard; a hairline-ruled strip of figures
+  reads as a magazine.
+- **The ledger is a wine list.** The beer and brewery stack, with the markup's
+  hard-coded `· ` pulled into the margin as real hanging punctuation.
+- **The masthead only goes sticky at ≥46rem.** Eight spaced-caps nav items need
+  three lines at 375px, and a sticky header would eat a quarter of the phone
+  viewport.
+
+This replaced an inherited amber-on-black theme carried over from Matinée. That
+was coherent but generic; the product's whole claim is that it is *taste-first*,
+and prose deserves to be set like prose.
+
+Fonts are self-hosted — see [`public/assets/fonts/README.md`](../public/assets/fonts/README.md).
+The privacy page promises no third-party requests, so a Google Fonts link would
+make it a lie.
 
 ## LLD — rate limiting
 

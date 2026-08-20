@@ -2,6 +2,8 @@
 
 **Your beer life, on draught.**
 
+Set in EB Garamond, on paper. See [`docs/DESIGN.md`](docs/DESIGN.md#the-look).
+
 **Live: [ondraught.pages.dev](https://ondraught.pages.dev)**
 
 Log the beer you drink. Rate it in half-stars, write down what you actually
