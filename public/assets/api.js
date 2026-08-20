@@ -40,6 +40,8 @@ export const api = {
   addToList: (id, body) => req(`/lists/${id}/items`, { method: 'POST', body }),
   removeFromList: (id, beerId) => req(`/lists/${id}/items/${beerId}`, { method: 'DELETE' }),
   deleteAccount: () => req('/account', { method: 'DELETE' }),
+  searchVenues: (q) => req(`/venues/search?q=${encodeURIComponent(q)}`),
+  map: (scope) => req(`/map?scope=${encodeURIComponent(scope)}`),
 };
 
 // Photos go up as raw bytes, not multipart — there's one file and no fields.

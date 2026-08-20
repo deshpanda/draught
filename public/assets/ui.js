@@ -216,3 +216,39 @@ export function listCard(l, handle) {
     </span>
   </a>`;
 }
+
+// ---- the map --------------------------------------------------------------
+
+// Asks the device where it is. Resolves to null rather than throwing when the
+// answer is "no" — a refused permission is a normal outcome, not an error.
+export function askLocation() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  });
+}
+
+// One dot per venue, area proportional to pours so a busy bar reads as busier
+// without a big number swamping the map.
+export function mapSvg(venues, project, view) {
+  const [w, h] = view;
+  const max = Math.max(1, ...venues.map((v) => v.pours));
+  const dots = venues.map((v) => {
+    const [x, y] = project(v.lat, v.lon);
+    const r = 2.2 + 4.6 * Math.sqrt(v.pours / max);
+    const label = [v.name, v.city, v.country].filter(Boolean).join(', ');
+    return `<g class="pin" data-slug="${esc(v.slug)}">
+      <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}"></circle>
+      <circle class="halo" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r + 5).toFixed(1)}"></circle>
+      <title>${esc(label)} — ${plural(v.pours, 'pour')}${
+        v.drinkers > 1 ? `, ${plural(v.drinkers, 'drinker')}` : ''
+      }</title></g>`;
+  }).join('');
+  return `<svg class="worldmap" viewBox="0 0 ${w} ${h}" role="img"
+    aria-label="World map of where people are drinking">${
+    '<!--countries-->'}<g class="pins">${dots}</g></svg>`;
+}

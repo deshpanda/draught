@@ -5,7 +5,7 @@ import { STYLES, FAMILIES, findStyle } from './styles.js';
 import {
   esc, stars, outOfFive, fmtDate, today, plural,
   tile, blockHead, pourRow, starRail, bindStarRail, bindAutocomplete,
-  prepPhoto, photoImg, followBtn, bindFollow, listCard,
+  prepPhoto, photoImg, followBtn, bindFollow, listCard, askLocation, mapSvg,
 } from './ui.js';
 
 const app = document.getElementById('app');
@@ -26,6 +26,7 @@ function parse(pathname) {
   if (path === '/lists') return { view: 'allLists' };
   if (path === '/settings') return { view: 'settings' };
   if (path === '/privacy') return { view: 'privacy' };
+  if (path === '/map') return { view: 'map' };
 
   const list = path.match(/^\/@([^/]+)\/list\/([^/]+)$/);
   if (list) return { view: 'list', handle: list[1].toLowerCase(), slug: list[2] };
@@ -54,7 +55,8 @@ document.addEventListener('click', (e) => {
   // truthiness. Anything under /api/ is a real navigation whatever it's marked.
   if (a.hasAttribute('data-raw') || a.getAttribute('href').startsWith('/api/')) return;
   e.preventDefault();
-  if (a.getAttribute('href') !== location.pathname) go(a.getAttribute('href'));
+  const href = a.getAttribute('href');
+  if (href !== location.pathname + location.search) go(href);
 });
 addEventListener('popstate', () => render());
 
@@ -65,6 +67,7 @@ function renderNav() {
   const on = (p) => (here === p ? ' class="on"' : '');
   if (!state.me) {
     nav.innerHTML = `<a href="/recent"${on('/recent')}>Bar</a>
+      <a href="/map"${on('/map')}>Map</a>
       <a href="/lists"${on('/lists')}>Lists</a>
       <a class="cta" href="/api/auth/google" data-raw>Sign in</a>`;
     return;
@@ -73,6 +76,7 @@ function renderNav() {
   nav.innerHTML = `
     <a href="/feed"${on('/feed')}>Feed</a>
     <a href="/recent"${on('/recent')}>Bar</a>
+    <a href="/map"${on('/map')}>Map</a>
     <a href="/lists"${on('/lists')}>Lists</a>
     ${h ? `<a href="/@${esc(h)}"${on(`/@${h}`)}>Your shelf</a>` : ''}
     <a href="/settings"${on('/settings')}>Settings</a>
@@ -238,8 +242,19 @@ function viewLog() {
           </div>
           <div class="field">
             <label for="venue">Where</label>
-            <input id="venue" name="venue" maxlength="80" placeholder="home">
+            <input id="venue" name="venue" maxlength="80" placeholder="The Palace" autocomplete="off">
+            <div class="ac" id="acVenue"></div>
           </div>
+        </div>
+        <div class="field">
+          <div class="geo">
+            <button type="button" class="btn" id="pin">Pin this spot</button>
+            <span class="geo-state" id="geoState">no location attached</span>
+          </div>
+          <label class="rank-toggle geo-off"><input type="checkbox" id="geoPrivate"> keep off the map</label>
+          <p class="hint">Pinning makes the venue's location public and permanent, so
+            everyone sees the same dot. Places named like somewhere private — “home”,
+            “my flat” — never get coordinates, whatever you pin.</p>
         </div>
         <button class="btn btn-amber btn-lg" type="submit" id="submit">Log it</button>
         <p class="msg" id="msg"></p>
@@ -279,6 +294,37 @@ function viewLog() {
   styleSel.addEventListener('change', () => {
     const s = findStyle(styleSel.value);
     abvHint.textContent = s ? `${s.origin} · typically ${s.abvLow}–${s.abvHigh}%` : '';
+  });
+
+  // Venue typeahead over places people have already drunk, so a bar gets one
+  // dot rather than one per spelling.
+  let pinned = null;
+  bindAutocomplete(
+    form.venue, app.querySelector('#acVenue'),
+    async (q) => (await api.searchVenues(q)).results.map((v) => ({
+      label: v.name,
+      sub: [v.city, v.country, v.pours ? plural(v.pours, 'pour') : ''].filter(Boolean).join(' · '),
+      raw: v,
+    })),
+    (pick) => {
+      form.venue.value = pick.label;
+      if (pick.raw.lat != null) {
+        pinned = null;   // it already has a pin; don't overwrite it
+        app.querySelector('#geoState').textContent = 'already pinned on the map';
+      }
+    }
+  );
+
+  app.querySelector('#pin').addEventListener('click', async () => {
+    const state = app.querySelector('#geoState');
+    state.textContent = 'asking your device…';
+    const loc = await askLocation();
+    if (!loc) {
+      state.textContent = 'location unavailable — type the venue name instead';
+      return;
+    }
+    pinned = loc;
+    state.textContent = `pinned at ${loc.lat.toFixed(3)}, ${loc.lon.toFixed(3)}`;
   });
 
   bindAutocomplete(
@@ -333,7 +379,10 @@ function viewLog() {
         photoKey,
         note: form.note.value,
         serving: form.serving.value,
-        venue: form.venue.value,
+        venueName: form.venue.value,
+        lat: pinned?.lat, lon: pinned?.lon,
+        venueCity: pinned ? '' : undefined,
+        geoPrivate: app.querySelector('#geoPrivate').checked,
         drunkOn: form.drunkOn.value,
       });
       go(`/b/${res.brewery.slug}/${res.beer.slug}`);
@@ -820,6 +869,29 @@ function viewPrivacy() {
     </section>
 
     <section class="block">
+      ${blockHead('where you drank')}
+      <p>Attaching a venue is optional, and pinning its coordinates is a separate,
+        deliberate tap. What that publishes:</p>
+      <table class="tbl">
+        <tr><th>Venues are shared</th><td>A venue is a public place, like a brewery —
+          pin it once and everyone logging there gets the same dot. Its coordinates are
+          public and permanent.</td></tr>
+        <tr><th>Coarse on purpose</th><td>Coordinates are rounded to about 11 metres
+          before they are stored. Enough to place a bar on a street; not a flat within
+          a building.</td></tr>
+        <tr><th>Private-sounding names get no pin</th><td>Anything called “home”, “my
+          flat”, “office” and the like is stored <strong>without coordinates at all</strong>,
+          whatever your device reported. You can't accidentally publish your address by
+          pinning the sofa.</td></tr>
+        <tr><th>Keep off the map</th><td>Any pour can be marked so it never appears on a
+          public map, while still showing on your own shelf.</td></tr>
+      </table>
+      <p>Your device is only ever asked for its location when you tap
+        <strong>Pin this spot</strong>. Draught does no background location tracking and
+        cannot see where you are otherwise.</p>
+    </section>
+
+    <section class="block">
       ${blockHead('photos and location')}
       <p>Phone cameras bury GPS coordinates inside photo files. Draught resizes and
         re-encodes every photo <strong>in your browser before it uploads</strong>, which
@@ -864,6 +936,85 @@ function viewPrivacy() {
   </div>`;
 }
 
+let WORLD_CACHE = null;
+
+async function viewMap() {
+  loading();
+  const scope = new URLSearchParams(location.search).get('scope')
+    || (state.me?.handle ? 'following' : 'all');
+
+  // The map paths are 75 KB — only pulled in for the page that draws them.
+  if (!WORLD_CACHE) {
+    try { WORLD_CACHE = await import('./worldmap.js'); }
+    catch { return oops('The map failed to load.'); }
+  }
+  const { WORLD, WORLD_VIEW } = WORLD_CACHE;
+  const { project } = await import('./geo.js');
+
+  let data;
+  try { data = await api.map(scope); }
+  catch (err) { return oops(err.message); }
+
+  const countries = Object.entries(WORLD)
+    .map(([name, d]) => `<path d="${d}" data-c="${esc(name)}"></path>`).join('');
+  const svg = mapSvg(data.venues, project, WORLD_VIEW).replace('<!--countries-->',
+    `<g class="land">${countries}</g>`);
+
+  const tab = (key, label) =>
+    `<a class="chip${scope === key ? ' chip-on' : ''}" href="/map?scope=${key}">${label}</a>`;
+
+  const top = [...data.venues].sort((a, b) => b.pours - a.pours).slice(0, 12);
+
+  app.innerHTML = `<div class="wrap">
+    <section class="hero"><p class="kicker">the map</p>
+      <h2>Where it's being <em>drunk</em></h2>
+      <p>${scope === 'following'
+        ? 'Places you and the people you follow have logged a beer.'
+        : scope === 'all' ? 'Every pinned venue on Draught.'
+        : `Places @${esc(scope)} has logged a beer.`}</p></section>
+
+    <div class="chips maptabs">
+      ${state.me?.handle ? tab('following', 'Your people') : ''}
+      ${tab('all', 'Everyone')}
+      ${state.me?.handle ? tab(state.me.handle, 'Just you') : ''}
+    </div>
+
+    <section class="block">
+      ${data.venues.length
+        ? `<div class="mapwrap">${svg}</div>`
+        : `<div class="empty"><p>No pinned venues yet.</p>
+            <p class="hint">Log a beer, tap <strong>Pin this spot</strong>, and it lands here.</p>
+            ${state.me ? '<a class="btn btn-amber" href="/log">Log a beer</a>' : ''}</div>`}
+    </section>
+
+    ${top.length ? `<section class="block">
+      ${blockHead('the locals', plural(data.venues.length, 'venue'))}
+      <ul class="tally">${top.map((v, i) => `
+        <li><span class="n">${i + 1}</span>
+          <span class="name">${esc(v.name)}${
+            v.city || v.country ? `<span class="extra"> ${esc([v.city, v.country].filter(Boolean).join(', '))}</span>` : ''}
+            ${v.handles.length ? `<span class="extra"> · ${v.handles.slice(0, 4).map((h) =>
+              `<a href="/@${esc(h)}">@${esc(h)}</a>`).join(' ')}${
+              v.handles.length > 4 ? ` +${v.handles.length - 4}` : ''}</span>` : ''}</span>
+          <span class="count">${v.pours}</span></li>`).join('')}</ul>
+    </section>` : ''}
+
+    ${data.origins.length ? `<section class="block">
+      ${blockHead('where the beer is from', 'by brewery country')}
+      <div class="chips">${data.origins.slice(0, 20).map((o) =>
+        `<span class="chip">${esc(o.country)}<span class="n">${o.pours}</span></span>`).join('')}</div>
+    </section>` : ''}
+  </div>`;
+
+  // Clicking a dot goes to whoever drank there, when it's a single person.
+  app.querySelector('.pins')?.addEventListener('click', (e) => {
+    const pin = e.target.closest('.pin');
+    if (!pin) return;
+    const v = data.venues.find((x) => x.slug === pin.dataset.slug);
+    if (v?.handles.length === 1) go(`/@${v.handles[0]}`);
+  });
+}
+
 // ---- boot ------------------------------------------------------------------
 
 function render() {
@@ -884,6 +1035,7 @@ function render() {
     case 'list': return viewList(r.handle, r.slug);
     case 'allLists': return viewAllLists();
     case 'privacy': return viewPrivacy();
+    case 'map': return viewMap();
     default: return oops('There is nothing at that address.');
   }
 }

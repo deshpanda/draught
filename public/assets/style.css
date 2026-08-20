@@ -353,3 +353,36 @@ button.chip { font: inherit; font-size: 0.84rem; cursor: pointer; }
 .btn-danger:hover { background: var(--red); color: #14100a; border-color: var(--red); }
 .foot a { color: var(--faint); }
 .foot a:hover { color: var(--amber); }
+
+/* ---------- the map ---------- */
+.mapwrap { background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px; overflow-x: auto; }
+.worldmap { display: block; width: 100%; min-width: 620px; height: auto; }
+.worldmap .land path { fill: #2a231b; stroke: #3d3325; stroke-width: 0.6;
+  vector-effect: non-scaling-stroke; }
+.worldmap .pins circle { fill: var(--amber); opacity: 0.88; }
+.worldmap .pins .halo { fill: var(--amber); opacity: 0.13; }
+.worldmap .pin { cursor: pointer; }
+.worldmap .pin:hover circle { fill: var(--foam); opacity: 1; }
+.worldmap .pin:hover .halo { opacity: 0.3; }
+.maptabs { margin-bottom: 14px; }
+.maptabs .chip { text-decoration: none; }
+
+/* location capture on the log form */
+.geo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.geo-state { font-family: var(--mono); font-size: 0.7rem; color: var(--faint); letter-spacing: 0.06em; }
+.geo-off { margin-top: 10px; }
+
+/* ---------- tallies (map leaderboards) ----------
+   Its own class rather than reusing .ranked, which already marks a ranked list
+   <ol> — one class doing two jobs has caused a layout bug here once already. */
+.tally { list-style: none; margin: 0; padding: 0; }
+.tally li { display: flex; align-items: baseline; gap: 10px; padding: 9px 0;
+  border-bottom: 1px dashed var(--line); font-size: 0.95rem; }
+.tally li:last-child { border-bottom: 0; }
+.tally .n { font-family: var(--mono); font-size: 0.72rem; color: var(--faint); width: 1.6em; flex: none; }
+.tally .name { flex: 1; min-width: 0; }
+.tally .count { font-family: var(--mono); font-size: 0.82rem; color: var(--amber); flex: none; }
+.tally .extra { font-family: var(--mono); font-size: 0.7rem; color: var(--faint); }
+.tally .extra a { color: var(--muted); }
+.tally .extra a:hover { color: var(--amber); }

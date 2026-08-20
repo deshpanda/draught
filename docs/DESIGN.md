@@ -216,6 +216,41 @@ bin only genuinely unreferenced R2 objects. Canonical breweries and beers stay:
 other people's pours point at them, and deleting a beer because one drinker left
 would vandalise their shelves.
 
+## LLD — the map
+
+`worldmap.js` is Natural Earth 110m country outlines baked into equirectangular
+SVG paths (viewBox 1000x403, Antarctica clipped), served from our own origin.
+**No tile server and no map library** — a tile request would leak every viewer's
+IP to a third party, and the privacy page promises that doesn't happen.
+
+The projection was recovered from the path data rather than documented anywhere:
+longitude spans the full width, giving `1000/360 = 2.7778 px/deg`, and the
+vertical offset came from fitting the path bounding box (y 4..391) to Natural
+Earth's land extremes — 83.6°N at Greenland, -55.9°S at Cape Horn — which puts
+viewBox y=0 at **85.04°N**. Validated by projecting twelve known cities and
+asserting each falls inside its own country's path via `isPointInFill`. Eleven
+hit; Sydney lands 1px offshore, which is the 110m coastline's own coarseness
+(1px = 0.36° ≈ 40km), not a projection error.
+
+### The privacy line on location
+
+Publishing "who drank where" is the feature. Publishing someone's home address
+is not — and "where I drink most" is very often home. Four guards:
+
+| Guard | Effect |
+| --- | --- |
+| Rounding | Coordinates are cut to 4 dp (~11m) *before* storage. Enough for a bar, not a flat. |
+| Name check | Venues named `home`, `my flat`, `office`… are stored with **no coordinates at all**, whatever the device reported. Whole-name match, so "The Homestead" is unaffected. |
+| `geo_private` | Any pour can be excluded from every public map query while still showing on its own shelf. |
+| Explicit capture | The device is only asked on an explicit "Pin this spot" tap. No background tracking. |
+
+Venues are canonical and shared, keyed by the same `slugify` as breweries, so
+two people at the same bar produce one dot rather than one per spelling.
+
+`venues.created_by` deliberately carries **no foreign key**: `beers.created_by`
+has one with no `ON DELETE` action, which blocked account deletion outright until
+it was nulled first. Once was enough.
+
 ## Explicit non-goals
 
 No badges, streaks or check-in mechanics. No ads. No email storage. No

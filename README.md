@@ -2,7 +2,7 @@
 
 **Your beer life, on draught.**
 
-**Live: [draught-5bp.pages.dev](https://draught-5bp.pages.dev)**
+**Live: [ondraught.pages.dev](https://ondraught.pages.dev)**
 
 Log the beer you drink. Rate it in half-stars, write down what you actually
 thought, and watch your taste take shape — the beers, the breweries, the styles
@@ -39,6 +39,7 @@ Draught takes that axis:
 | `/@handle/lists` · `/@handle/list/:slug` | Their lists, and one list in full |
 | `/@handle/followers` · `/following` | Who's at whose table |
 | `/b/:brewery/:beer` | A beer's page: hero photo, mean rating, histogram, the margins |
+| `/map` | The map — pinned venues, filtered to everyone, your people, or just you |
 | `/recent` | The bar — the last forty pours logged, by anyone |
 | `/lists` | The library — lists from across Draught |
 | `/settings` | Display name and bio |
@@ -63,7 +64,11 @@ Cloudflare Pages Functions  ──▶  Open Brewery DB (brewery lookup)
   dependencies, no bundler. `public/` is the deployable artefact as-is.
 - **API** — one catch-all Pages Function, `functions/api/[[route]].js`. OAuth
   against Google, opaque session tokens hashed into D1.
-- **Data** — D1. Eight tables; a pour is a row. Label photos live in R2.
+- **Data** — D1. Ten tables; a pour is a row. Label photos live in R2.
+- **The map** — `worldmap.js` is Natural Earth country outlines baked into
+  equirectangular SVG paths and served from our own origin. No tile server and no
+  map library, because a tile request would hand every viewer's IP to a third
+  party — which the privacy page promises doesn't happen.
 
 The API lives on the same origin as the page, so the session is an
 `HttpOnly; SameSite=Lax` cookie rather than a token in `localStorage`, and there
@@ -174,11 +179,12 @@ door. `/api/auth/dev` 404s unless the flag is present.
 npm test
 ```
 
-Thirteen tests over the pure parts: slug collision (the rule that decides when two
+Seventeen tests over the pure parts: slug collision (the rule that decides when two
 people have logged the same beer), input cleaning, handle validation, half-star
 rendering, HTML escaping, the integrity of the style canon, and a pinned regression for the link
 interceptor (a valueless `data-raw` attribute is `""`, so guarding on its
-truthiness silently swallowed every `/api/` navigation — including sign-in).
+truthiness silently swallowed every `/api/` navigation — including sign-in), the
+private-venue-name guard, coordinate rounding, and the map projection.
 
 ## Non-goals
 

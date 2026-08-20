@@ -114,3 +114,41 @@ test('429 carries Retry-After and a readable message', async () => {
   // singular minute reads correctly too
   assert.match((await tooMany({ what: 'x', retryAfter: 30 }).json()).error, /a minute/);
 });
+
+import { looksPrivate } from '../functions/_shared/venues.js';
+import { project, roundCoord, onMap, TOP_LAT, PX_PER_DEG } from '../public/assets/geo.js';
+
+test('private-sounding venue names never get coordinates', () => {
+  for (const n of ['home', 'Home', ' my flat ', 'office', 'airbnb', 'my couch', 'dorm'])
+    assert.ok(looksPrivate(n), `${n} must be treated as private`);
+  // real venues that merely contain a private-ish word must still be pinnable
+  for (const n of ['The Homestead', 'Home Brew Bar', 'Office Beer Co', 'Flat Iron Square'])
+    assert.ok(!looksPrivate(n), `${n} is a real venue`);
+});
+
+test('venue coordinates are rounded to ~11m, not stored raw', () => {
+  assert.equal(roundCoord(51.50735142), 51.5074);
+  assert.equal(roundCoord(-0.12775899), -0.1278);
+  // 4dp is ~11m at the equator; assert we never keep more precision than that
+  assert.equal(String(roundCoord(12.978412345)).split('.')[1].length <= 4, true);
+});
+
+test('map projection places known coordinates correctly', () => {
+  // the prime meridian must land at the horizontal centre
+  assert.equal(Math.round(project(0, 0)[0]), 500);
+  // antimeridians at the edges
+  assert.equal(Math.round(project(0, -180)[0]), 0);
+  assert.equal(Math.round(project(0, 180)[0]), 1000);
+  // latitude decreases downward, at the same scale as longitude
+  const [, yTop] = project(TOP_LAT, 0);
+  assert.equal(Math.round(yTop), 0);
+  assert.ok(project(0, 0)[1] > 0 && project(-50, 0)[1] > project(50, 0)[1]);
+  assert.equal(Math.round(PX_PER_DEG * 360), 1000);
+});
+
+test('onMap rejects what the clipped map cannot show', () => {
+  assert.ok(onMap(51.5, -0.12));
+  assert.ok(!onMap(-85, 0), 'Antarctica is clipped off this map');
+  assert.ok(!onMap(0, 200), 'longitude out of range');
+  assert.ok(!onMap('nonsense', 0));
+});

@@ -26,6 +26,8 @@
 //   PUT    /api/lists/:id/order      { order: [beerId, ...] }
 //   GET    /api/users/:handle/lists  and .../lists/:slug
 //   DELETE /api/account              erases everything, including R2 objects
+//   GET    /api/venues/search?q=
+//   GET    /api/map?scope=all|following|<handle>
 //
 // Every write is rate limited (see _shared/ratelimit.js) — each one mints state
 // other people see, so a script must not be able to flood it.
@@ -39,6 +41,7 @@ import { upload, serve as servePhoto, discard, photoKeyOk } from '../_shared/pho
 import { follow, followCounts, viewerFollows, feed, people } from '../_shared/social.js';
 import * as lists from '../_shared/lists.js';
 import { guard, actorOf } from '../_shared/ratelimit.js';
+import * as venues from '../_shared/venues.js';
 
 export async function onRequest(context) {
   const { request, env, params } = context;
@@ -95,6 +98,14 @@ export async function onRequest(context) {
       const capped = await guard(env, 'brewerySearch', actorOf(request, null));
       if (capped) return capped;
       return json({ results: await searchBreweries(env, url.searchParams.get('q') || '') });
+    }
+
+    if (route[0] === 'venues' && route[1] === 'search' && method === 'GET') {
+      return venues.search(env, url.searchParams.get('q') || '');
+    }
+
+    if (route[0] === 'map' && method === 'GET') {
+      return venues.map(env, await currentUser(request, env), url.searchParams.get('scope') || 'all');
     }
 
     if (route[0] === 'search' && route[1] === 'beers' && method === 'GET') {
@@ -290,12 +301,34 @@ async function logPour(env, user, body) {
     await env.DB.prepare('UPDATE beers SET abv = ? WHERE id = ?').bind(abv, beer.id).run();
   }
 
+  // Same courtesy for the brewery's home: whoever knows it first fills it in,
+  // and nobody overwrites what's already there. Without this a brewery created
+  // early with no country never gains one, and it silently vanishes from the
+  // map's origin tally forever.
+  const country = clean(body.country, 60);
+  const city = clean(body.city, 60);
+  if ((country && !brewery.country) || (city && !brewery.city)) {
+    await env.DB.prepare(
+      `UPDATE breweries SET country = CASE WHEN country = '' THEN ? ELSE country END,
+                            city    = CASE WHEN city    = '' THEN ? ELSE city    END
+       WHERE id = ?`
+    ).bind(country, city, brewery.id).run();
+  }
+
+  // A named venue becomes a shared, pinnable place. Falls back to plain text if
+  // it can't be resolved, so a pour is never lost to a venue problem.
+  let venue = null;
+  try { venue = await venues.resolve(env, user, body); } catch { venue = null; }
+
   const res = await env.DB.prepare(
-    `INSERT INTO pours (user_id, beer_id, rating, note, serving, venue, drunk_on, photo_key, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO pours (user_id, beer_id, rating, note, serving, venue, venue_id, geo_private,
+                        drunk_on, photo_key, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     user.id, beer.id, rating, clean(body.note, 2000),
-    clean(body.serving, 16), clean(body.venue, 80), drunkOn, photoKey, t
+    clean(body.serving, 16), clean(body.venueName ?? body.venue, 80),
+    venue?.id ?? null, body.geoPrivate ? 1 : 0,
+    drunkOn, photoKey, t
   ).run();
 
   // The first photo anyone takes becomes the beer's face everywhere else. The
@@ -371,6 +404,7 @@ async function eraseAccount(env, user, secure) {
   // beer to them.
   await env.DB.batch([
     env.DB.prepare('UPDATE beers SET created_by = NULL WHERE created_by = ?').bind(user.id),
+    env.DB.prepare('UPDATE venues SET created_by = NULL WHERE created_by = ?').bind(user.id),
     env.DB.prepare('DELETE FROM list_items WHERE list_id IN (SELECT id FROM lists WHERE user_id = ?)').bind(user.id),
     env.DB.prepare('DELETE FROM lists WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM follows WHERE follower_id = ? OR followee_id = ?').bind(user.id, user.id),

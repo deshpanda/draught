@@ -56,11 +56,27 @@ CREATE TABLE IF NOT EXISTS pours (
   venue      TEXT NOT NULL DEFAULT '',
   drunk_on   TEXT NOT NULL,              -- YYYY-MM-DD, the drinker's local date
   photo_key  TEXT,                        -- R2 object key for the drinker's shot
+  venue_id   INTEGER REFERENCES venues(id) ON DELETE SET NULL,
+  geo_private INTEGER NOT NULL DEFAULT 0, -- 1 = never on a public map
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_pours_user ON pours(user_id, drunk_on DESC);
 CREATE INDEX IF NOT EXISTS idx_pours_beer ON pours(beer_id);
 CREATE INDEX IF NOT EXISTS idx_pours_recent ON pours(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS venues (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug       TEXT UNIQUE NOT NULL,
+  name       TEXT NOT NULL,
+  lat        REAL,
+  lon        REAL,
+  city       TEXT NOT NULL DEFAULT '',
+  country    TEXT NOT NULL DEFAULT '',
+  created_by TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_venues_geo ON venues(lat, lon);
+CREATE INDEX IF NOT EXISTS idx_pours_venue ON pours(venue_id);
 
 -- ---- following ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS follows (

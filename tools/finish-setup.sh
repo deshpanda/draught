@@ -7,12 +7,15 @@
 #   ./tools/finish-setup.sh              # prompts, nothing echoed to the terminal
 #   pbpaste | ./tools/finish-setup.sh    # take it from the clipboard instead
 #
+# Targets the ondraught project by default. Override for another deployment:
+#   DRAUGHT_PROJECT=draught DRAUGHT_SITE=https://draught-5bp.pages.dev ./tools/finish-setup.sh
+#
 # Safe to re-run. Never writes the secret to disk, history, or a log.
 
 set -euo pipefail
 
-PROJECT="draught"
-SITE="https://draught-5bp.pages.dev"
+PROJECT="${DRAUGHT_PROJECT:-ondraught}"
+SITE="${DRAUGHT_SITE:-https://ondraught.pages.dev}"
 NAME="GOOGLE_CLIENT_SECRET"
 
 cd "$(dirname "$0")/.."
