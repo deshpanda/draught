@@ -25,6 +25,7 @@ function parse(pathname) {
   if (path === '/feed') return { view: 'feed' };
   if (path === '/lists') return { view: 'allLists' };
   if (path === '/settings') return { view: 'settings' };
+  if (path === '/privacy') return { view: 'privacy' };
 
   const list = path.match(/^\/@([^/]+)\/list\/([^/]+)$/);
   if (list) return { view: 'list', handle: list[1].toLowerCase(), slug: list[2] };
@@ -565,7 +566,19 @@ function viewSettings() {
         <button class="btn btn-amber" type="submit">Save</button>
         <p class="msg" id="msg"></p>
       </form>
-    </div></section></div>`;
+    </div></section>
+
+    <section class="block">
+      ${blockHead('leaving')}
+      <div class="panel danger" style="max-width:520px">
+        <p>Deleting your account removes your handle, pours, notes, photos, lists and
+          follows — the photo files as well, not just the rows. It cannot be undone.</p>
+        <p class="hint">Breweries and beers stay, because other people's pours point at
+          them. <a href="/privacy">What Draught knows</a>.</p>
+        <button class="btn btn-danger" id="nuke">Delete my account</button>
+        <p class="msg" id="dmsg"></p>
+      </div>
+    </section></div>`;
 
   const form = app.querySelector('#sform');
   const msg = app.querySelector('#msg');
@@ -580,6 +593,26 @@ function viewSettings() {
     } catch (err) {
       msg.className = 'msg err'; msg.textContent = err.message;
     }
+  });
+
+  // Deliberate friction: typing the handle is the difference between a misclick
+  // and a decision, and this one erases photos that cannot come back.
+  app.querySelector('#nuke')?.addEventListener('click', async () => {
+    const dmsg = app.querySelector('#dmsg');
+    const typed = prompt(`This erases everything. Type your handle (${state.me.handle}) to confirm.`);
+    if (typed !== state.me.handle) {
+      if (typed !== null) {
+        dmsg.className = 'msg err';
+        dmsg.textContent = "That didn't match — nothing was deleted.";
+      }
+      return;
+    }
+    dmsg.className = 'msg'; dmsg.textContent = 'erasing…';
+    try {
+      await api.deleteAccount();
+      state.me = null; state.stats = null;
+      go('/');
+    } catch (err) { dmsg.className = 'msg err'; dmsg.textContent = err.message; }
   });
 }
 
@@ -745,6 +778,92 @@ async function viewAllLists() {
   </div>`;
 }
 
+function viewPrivacy() {
+  app.innerHTML = `<div class="wrap prose">
+    <section class="hero"><p class="kicker">privacy</p>
+      <h2>What Draught <em>knows</em></h2>
+      <p>Written to be read, not to be survived. If anything below is unclear,
+        that's a bug in the writing — say so.</p></section>
+
+    <section class="block">
+      ${blockHead('the short version')}
+      <p>Draught stores the beer you log and the handle you chose. It never learns
+        your email address, never sets a tracking cookie, and runs no analytics.
+        Your pours are public, because a shared record per beer is the entire point.</p>
+    </section>
+
+    <section class="block">
+      ${blockHead('what is stored')}
+      <table class="tbl">
+        <tr><th>Your account</th><td>A handle, a display name, an avatar URL, and an
+          optional bio. Plus an opaque account id from Google — <strong>not your email
+          address</strong>, which Draught neither asks for nor keeps.</td></tr>
+        <tr><th>Your pours</th><td>Beer, brewery, style, ABV, your half-star rating,
+          your notes, the date, the serving, the venue if you typed one, and any photo
+          you attached.</td></tr>
+        <tr><th>Lists and follows</th><td>List titles, descriptions, the beers on them,
+          and who you follow.</td></tr>
+        <tr><th>Your session</th><td>One cookie, <code>dr_sess</code>. It is
+          <code>HttpOnly</code> and <code>SameSite=Lax</code>, holds a random token and
+          nothing about you, and only its hash is stored server-side. There are no other
+          cookies of any kind.</td></tr>
+      </table>
+    </section>
+
+    <section class="block">
+      ${blockHead('what is public')}
+      <p>Your handle, display name, avatar, bio, pours, notes, photos, lists, and who
+        you follow — all visible to anyone, signed in or not, at
+        <code>/@yourhandle</code>. Assume anything you log can be read by anyone and
+        indexed by search engines. There is no private mode; if that doesn't suit you,
+        Draught is the wrong tool.</p>
+    </section>
+
+    <section class="block">
+      ${blockHead('photos and location')}
+      <p>Phone cameras bury GPS coordinates inside photo files. Draught resizes and
+        re-encodes every photo <strong>in your browser before it uploads</strong>, which
+        strips that metadata along with the rest of the EXIF block. A label shot taken at
+        home does not publish where you live. The photo itself is public.</p>
+    </section>
+
+    <section class="block">
+      ${blockHead('who else sees anything')}
+      <table class="tbl">
+        <tr><th>Google</th><td>Only when you sign in. Draught asks for the minimum —
+          <code>openid</code>, <code>email</code>, <code>profile</code> — and keeps only
+          the opaque id, your name and your avatar.</td></tr>
+        <tr><th>Open Brewery DB</th><td>When you type a brewery name, that text goes to
+          their public API to find matches. They see a search string with no identity
+          attached to it.</td></tr>
+        <tr><th>Cloudflare</th><td>Hosts the site, the database and the photos, and keeps
+          ordinary web server logs.</td></tr>
+      </table>
+      <p>Nothing is sold, shared for advertising, or handed to a data broker. There are
+        no third-party scripts on any page — no tag managers, no pixels, not even fonts
+        loaded from somewhere else.</p>
+    </section>
+
+    <section class="block">
+      ${blockHead('deleting it')}
+      <p>Go to <a href="/settings">Settings</a> and delete your account. It removes your
+        identity, pours, notes, photos, lists and follows immediately — the photo files
+        too, not just the rows pointing at them.</p>
+      <p>Breweries and beers themselves stay, because other people's pours point at them
+        and removing a beer would damage their shelves. Nothing left behind identifies
+        you.</p>
+    </section>
+
+    <section class="block">
+      ${blockHead('one caveat, honestly')}
+      <p>Draught is a personal project, not a company. It has no dedicated security team
+        and offers no uptime guarantee. It holds nothing more sensitive than opinions
+        about beer, and is built so that a breach could not reveal an email address —
+        because there are none to reveal. Judge it on that basis.</p>
+    </section>
+  </div>`;
+}
+
 // ---- boot ------------------------------------------------------------------
 
 function render() {
@@ -764,6 +883,7 @@ function render() {
     case 'userLists': return viewUserLists(r.handle);
     case 'list': return viewList(r.handle, r.slug);
     case 'allLists': return viewAllLists();
+    case 'privacy': return viewPrivacy();
     default: return oops('There is nothing at that address.');
   }
 }

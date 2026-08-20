@@ -170,6 +170,52 @@ Inherited from Matinée, because a projector lamp and a pint are the same colour
 against a heavy condensed display face, one accent and no second hue. The film
 grain becomes condensation on a cold glass. No web fonts.
 
+## LLD — rate limiting
+
+Fixed-window counters in D1, one row per `action:actor` bucket. The whole check
+is a single statement:
+
+```sql
+INSERT INTO rate_limits (bucket, window_start, count) VALUES (?1, ?2, 1)
+ON CONFLICT(bucket) DO UPDATE SET
+  window_start = CASE WHEN ?2 - rate_limits.window_start >= ?3 THEN ?2 ELSE rate_limits.window_start END,
+  count        = CASE WHEN ?2 - rate_limits.window_start >= ?3 THEN 1 ELSE rate_limits.count + 1 END
+RETURNING count, window_start
+```
+
+Read-then-write would race with itself and let bursts through; one UPSERT with
+`RETURNING` is atomic. The actor is the signed-in user id, falling back to
+`cf-connecting-ip` so anonymous endpoints are still bounded.
+
+| Action | Cap | Why |
+| --- | --- | --- |
+| `newBeer` | 25/h | The vandalism vector — this mints rows everyone sees |
+| `pour` | 40/h | Ordinary logging; deliberately looser than `newBeer` |
+| `upload` | 30/h | Costs storage |
+| `listItem` | 120/h | Cheap, curating is bursty |
+| `followAct` | 100/h | Stops follow-spam without hampering a browsing session |
+| `listCreate` | 15/h | |
+| `handleClaim` | 10/h | Also blunts handle enumeration |
+| `brewerySearch` | 300/h per IP | Politeness to Open Brewery DB's free API |
+
+Two deliberate choices: the limiter **fails open** (a broken limiter must not
+take logging down with it), and hitting the `newBeer` cap still lets you log
+against beers that already exist — the cap gates *creation*, not use.
+
+## LLD — deletion
+
+`DELETE /api/account` is the only destructive endpoint, and it is ordered for
+recoverability: collect the user's photo keys, run one **atomic batch** for every
+delete, then perform idempotent fixups.
+
+`beers.created_by` has no `ON DELETE` action, so a user who ever created a beer
+cannot be deleted while it references them — the batch nulls it first. (D1 *does*
+enforce foreign keys; assuming otherwise cost a debugging round.) The fixups hand
+any beer cover the departing user supplied to a surviving drinker's photo, then
+bin only genuinely unreferenced R2 objects. Canonical breweries and beers stay:
+other people's pours point at them, and deleting a beer because one drinker left
+would vandalise their shelves.
+
 ## Explicit non-goals
 
 No badges, streaks or check-in mechanics. No ads. No email storage. No

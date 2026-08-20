@@ -39,6 +39,7 @@ export const api = {
   deleteList: (id) => req(`/lists/${id}`, { method: 'DELETE' }),
   addToList: (id, body) => req(`/lists/${id}/items`, { method: 'POST', body }),
   removeFromList: (id, beerId) => req(`/lists/${id}/items/${beerId}`, { method: 'DELETE' }),
+  deleteAccount: () => req('/account', { method: 'DELETE' }),
 };
 
 // Photos go up as raw bytes, not multipart — there's one file and no fields.

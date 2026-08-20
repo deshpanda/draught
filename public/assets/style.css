@@ -329,3 +329,27 @@ button.chip { font: inherit; font-size: 0.84rem; cursor: pointer; }
 .picker-new input:focus { outline: 2px solid var(--amber); border-color: var(--amber); }
 .rank-toggle { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 6px; }
 .beer-acts { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ---------- prose pages (privacy) ---------- */
+.prose { max-width: 780px; }
+.prose p { color: var(--muted); margin: 0 0 12px; }
+.prose p strong { color: var(--text); }
+.prose code { font-family: var(--mono); font-size: 0.86em; color: var(--amber);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+.tbl { width: 100%; border-collapse: collapse; margin: 0 0 14px; }
+.tbl th, .tbl td { text-align: left; vertical-align: top; padding: 11px 14px 11px 0;
+  border-bottom: 1px dashed var(--line); }
+.tbl th { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--amber); font-weight: 700; white-space: nowrap; width: 1%; padding-right: 22px; }
+.tbl td { color: var(--muted); font-size: 0.93rem; }
+@media (max-width: 600px) {
+  .tbl th, .tbl td { display: block; border-bottom: 0; padding: 2px 0; }
+  .tbl td { padding-bottom: 14px; border-bottom: 1px dashed var(--line); }
+}
+
+/* ---------- the danger zone ---------- */
+.panel.danger { border-color: color-mix(in srgb, var(--red) 42%, var(--line)); }
+.btn-danger { border-color: var(--red); color: var(--red); }
+.btn-danger:hover { background: var(--red); color: #14100a; border-color: var(--red); }
+.foot a { color: var(--faint); }
+.foot a:hover { color: var(--amber); }

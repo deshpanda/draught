@@ -88,3 +88,29 @@ test('link interceptor lets real navigations through', () => {
   // the old bug, pinned: truthiness of "" must not be the test
   assert.equal(!!'', false, 'valueless data-raw is falsy — never guard on truthiness');
 });
+
+import { LIMITS, tooMany } from '../functions/_shared/ratelimit.js';
+
+test('every rate limit is sane and human-friendly', () => {
+  for (const [action, spec] of Object.entries(LIMITS)) {
+    assert.ok(spec.max > 0, `${action} has a positive ceiling`);
+    assert.ok(spec.window > 0, `${action} has a window`);
+    assert.ok(spec.what, `${action} names what it limits, for the error message`);
+    // A ceiling a real person could hit in normal use would be a bug, not a limit.
+    assert.ok(spec.max >= 10, `${action} ceiling (${spec.max}) is not hostile to humans`);
+  }
+  // Creating shared records must be capped tighter than logging against existing
+  // ones — a typo'd brewery becomes a page everyone else has to look at.
+  assert.ok(LIMITS.newBeer.max < LIMITS.pour.max, 'minting canonical rows is the tighter cap');
+});
+
+test('429 carries Retry-After and a readable message', async () => {
+  const res = tooMany({ what: 'pours', retryAfter: 3600 });
+  assert.equal(res.status, 429);
+  assert.equal(res.headers.get('retry-after'), '3600');
+  const body = await res.json();
+  assert.match(body.error, /Slow down/);
+  assert.match(body.error, /60 minutes/);
+  // singular minute reads correctly too
+  assert.match((await tooMany({ what: 'x', retryAfter: 30 }).json()).error, /a minute/);
+});

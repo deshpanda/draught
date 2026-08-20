@@ -47,7 +47,7 @@ export async function update(env, user, id, body) {
 export async function destroy(env, user, id) {
   const list = await owned(env, user, id);
   if (!list.ok) return list.err;
-  // list_items has ON DELETE CASCADE, but D1 needs foreign keys on to honour it.
+  // list_items cascades, but delete it explicitly so the intent is on the page.
   await env.DB.prepare('DELETE FROM list_items WHERE list_id = ?').bind(list.row.id).run();
   await env.DB.prepare('DELETE FROM lists WHERE id = ?').bind(list.row.id).run();
   return json({ ok: true });

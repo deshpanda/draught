@@ -25,6 +25,10 @@
 //   DELETE /api/lists/:id/items/:beerId
 //   PUT    /api/lists/:id/order      { order: [beerId, ...] }
 //   GET    /api/users/:handle/lists  and .../lists/:slug
+//   DELETE /api/account              erases everything, including R2 objects
+//
+// Every write is rate limited (see _shared/ratelimit.js) — each one mints state
+// other people see, so a script must not be able to flood it.
 
 import {
   json, bad, now, slugify, clean, isDate, HANDLE_RE, RESERVED,
@@ -34,6 +38,7 @@ import {
 import { upload, serve as servePhoto, discard, photoKeyOk } from '../_shared/photos.js';
 import { follow, followCounts, viewerFollows, feed, people } from '../_shared/social.js';
 import * as lists from '../_shared/lists.js';
+import { guard, actorOf } from '../_shared/ratelimit.js';
 
 export async function onRequest(context) {
   const { request, env, params } = context;
@@ -63,6 +68,8 @@ export async function onRequest(context) {
 
     if (route[0] === 'handle' && method === 'POST') {
       const u = await requireUser(request, env);
+      const capped = await guard(env, 'handleClaim', u.id);
+      if (capped) return capped;
       const { handle } = await request.json().catch(() => ({}));
       const h = String(handle || '').toLowerCase().trim();
       if (!HANDLE_RE.test(h)) return bad('Handles are 2–20 characters: letters, numbers, underscore.');
@@ -83,6 +90,10 @@ export async function onRequest(context) {
 
     // ---- search ----------------------------------------------------------
     if (route[0] === 'search' && route[1] === 'breweries' && method === 'GET') {
+      // Bounded by IP because it proxies Open Brewery DB — being a good guest
+      // on someone else's free API is our problem, not theirs.
+      const capped = await guard(env, 'brewerySearch', actorOf(request, null));
+      if (capped) return capped;
       return json({ results: await searchBreweries(env, url.searchParams.get('q') || '') });
     }
 
@@ -104,6 +115,8 @@ export async function onRequest(context) {
     if (route[0] === 'pours' && method === 'POST') {
       const u = await requireUser(request, env);
       if (!u.handle) return bad('Claim a handle first.', 409);
+      const capped = await guard(env, 'pour', u.id);
+      if (capped) return capped;
       return logPour(env, u, await request.json().catch(() => ({})));
     }
 
@@ -114,7 +127,9 @@ export async function onRequest(context) {
 
     // ---- photos ----------------------------------------------------------
     if (route[0] === 'upload' && method === 'POST') {
-      await requireUser(request, env);
+      const u = await requireUser(request, env);
+      const capped = await guard(env, 'upload', u.id);
+      if (capped) return capped;
       return upload(request, env);
     }
     if (route[0] === 'img' && route[1] && method === 'GET') return servePhoto(route[1], env);
@@ -123,6 +138,8 @@ export async function onRequest(context) {
     if (route[0] === 'follow' && route[1] && (method === 'POST' || method === 'DELETE')) {
       const u = await requireUser(request, env);
       if (!u.handle) return bad('Claim a handle first.', 409);
+      const capped = await guard(env, 'followAct', u.id);
+      if (capped) return capped;
       return follow(env, u, route[1], method === 'POST');
     }
 
@@ -137,6 +154,8 @@ export async function onRequest(context) {
     if (route[0] === 'lists' && !route[1] && method === 'POST') {
       const u = await requireUser(request, env);
       if (!u.handle) return bad('Claim a handle first.', 409);
+      const capped = await guard(env, 'listCreate', u.id);
+      if (capped) return capped;
       return lists.create(env, u, await request.json().catch(() => ({})));
     }
 
@@ -146,6 +165,8 @@ export async function onRequest(context) {
       if (!route[2] && method === 'PATCH') return lists.update(env, u, id, await request.json().catch(() => ({})));
       if (!route[2] && method === 'DELETE') return lists.destroy(env, u, id);
       if (route[2] === 'items' && !route[3] && method === 'POST') {
+        const capped = await guard(env, 'listItem', u.id);
+        if (capped) return capped;
         return lists.addItem(env, u, id, await request.json().catch(() => ({})));
       }
       if (route[2] === 'items' && route[3] && method === 'DELETE') {
@@ -192,6 +213,11 @@ export async function onRequest(context) {
       return json({ pours: results });
     }
 
+    if (route[0] === 'account' && method === 'DELETE') {
+      const u = await requireUser(request, env);
+      return eraseAccount(env, u, secure);
+    }
+
     return bad('No such endpoint.', 404);
   } catch (err) {
     if (err instanceof Response) return err;
@@ -211,6 +237,8 @@ async function requireUser(request, env) {
 // them. Dedup is by slug, so "Cloudwater" and "cloudwater " are one brewery.
 
 async function logPour(env, user, body) {
+  // Set by the caller below when this pour would create canonical rows.
+  let mintedSomething = false;
   const breweryName = clean(body.brewery, 80);
   const beerName = clean(body.beer, 100);
   if (!breweryName) return bad('Which brewery?');
@@ -234,6 +262,11 @@ async function logPour(env, user, body) {
 
   let brewery = await env.DB.prepare('SELECT * FROM breweries WHERE slug = ?').bind(brewerySlug).first();
   if (!brewery) {
+    // Creating shared records is capped harder than logging against existing
+    // ones: a typo here becomes a page every other drinker has to look at.
+    const capped = await guard(env, 'newBeer', user.id);
+    if (capped) return capped;
+    mintedSomething = true;
     await env.DB.prepare(
       'INSERT INTO breweries (slug, name, country, city, obdb_id, created_at) VALUES (?, ?, ?, ?, ?, ?)'
     ).bind(brewerySlug, breweryName, clean(body.country, 60), clean(body.city, 60), clean(body.obdbId, 60) || null, t).run();
@@ -243,6 +276,10 @@ async function logPour(env, user, body) {
   let beer = await env.DB.prepare('SELECT * FROM beers WHERE brewery_id = ? AND slug = ?')
     .bind(brewery.id, beerSlug).first();
   if (!beer) {
+    if (!mintedSomething) {
+      const capped = await guard(env, 'newBeer', user.id);
+      if (capped) return capped;
+    }
     await env.DB.prepare(
       'INSERT INTO beers (brewery_id, slug, name, style, abv, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).bind(brewery.id, beerSlug, beerName, clean(body.style, 60), abv, user.id, t).run();
@@ -307,6 +344,66 @@ async function deletePour(env, user, rawId) {
   if (!stillUsed && !stillCover) await discard(env, pour.photo_key);
 
   return json({ ok: true });
+}
+
+// Erase everything. A privacy policy that promises deletion needs a delete that
+// actually works, including the R2 objects — those outlive the database rows
+// otherwise, and "we deleted your account" would be a lie about the photos.
+//
+// Canonical breweries and beers deliberately survive: other people's pours point
+// at them, and removing a beer because one drinker left would vandalise their
+// shelves. What goes is everything personal — identity, pours, notes, photos,
+// follows, lists.
+async function eraseAccount(env, user, secure) {
+  // Collect the photo keys first — after the delete there is nothing left to
+  // ask, and the R2 objects would be orphaned with no way to find them.
+  const { results: photos } = await env.DB.prepare(
+    'SELECT photo_key FROM pours WHERE user_id = ? AND photo_key IS NOT NULL'
+  ).bind(user.id).all();
+  const keys = photos.map((r) => r.photo_key);
+
+  // The destructive half is one atomic batch, so a failure leaves the account
+  // wholly intact rather than half-erased.
+  //
+  // `beers.created_by` has no ON DELETE action, so a user who ever created a
+  // beer cannot be deleted while it points at them — null it first. That is the
+  // right outcome anyway: once someone leaves, nothing should still attribute a
+  // beer to them.
+  await env.DB.batch([
+    env.DB.prepare('UPDATE beers SET created_by = NULL WHERE created_by = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM list_items WHERE list_id IN (SELECT id FROM lists WHERE user_id = ?)').bind(user.id),
+    env.DB.prepare('DELETE FROM lists WHERE user_id = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM follows WHERE follower_id = ? OR followee_id = ?').bind(user.id, user.id),
+    env.DB.prepare('DELETE FROM pours WHERE user_id = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM rate_limits WHERE bucket LIKE ?').bind(`%:${user.id}`),
+    env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id),
+  ]);
+
+  // Now the fixups, which are idempotent: any beer still wearing one of this
+  // user's photos as its cover gets handed a surviving drinker's shot instead,
+  // and only genuinely unreferenced objects are binned. Canonical beers and
+  // breweries stay — other people's pours point at them, and deleting a beer
+  // because one drinker left would vandalise their shelves.
+  for (const key of keys) {
+    const cover = await env.DB.prepare('SELECT id FROM beers WHERE photo_key = ?').bind(key).first();
+    if (cover) {
+      const heir = await env.DB.prepare(
+        `SELECT photo_key FROM pours WHERE beer_id = ? AND photo_key IS NOT NULL
+         ORDER BY created_at LIMIT 1`
+      ).bind(cover.id).first();
+      await env.DB.prepare('UPDATE beers SET photo_key = ? WHERE id = ?')
+        .bind(heir?.photo_key ?? null, cover.id).run();
+    }
+
+    const stillPoured = await env.DB.prepare('SELECT 1 FROM pours WHERE photo_key = ? LIMIT 1').bind(key).first();
+    const stillCover = await env.DB.prepare('SELECT 1 FROM beers WHERE photo_key = ? LIMIT 1').bind(key).first();
+    if (!stillPoured && !stillCover) await discard(env, key);
+  }
+
+  return json({ ok: true, erased: { pours: keys.length } }, 200, {
+    'set-cookie': clearCookie('dr_sess', secure),
+  });
 }
 
 // ---- public reads ----------------------------------------------------------

@@ -72,6 +72,17 @@ is no CORS surface at all.
 See [docs/DESIGN.md](docs/DESIGN.md) for the schema, the routes and the
 trust boundaries.
 
+### Rate limits
+
+Every write is capped (`functions/_shared/ratelimit.js`), not because an attack
+is expected but because each one mints *shared* state — a typo'd brewery becomes
+a page every other drinker has to look at, and an upload costs storage. Creating
+canonical rows is capped harder (25/hr) than logging against beers that already
+exist (40/hr), so hitting the former never blocks ordinary use. Counters are
+fixed-window rows in D1, incremented by a single `UPSERT … RETURNING` so
+concurrent bursts can't race past the ceiling. A limiter failure fails *open* —
+it must never take the feature down with it.
+
 ### On privacy
 
 Draught has accounts, so — unlike a purely client-side dashboard — it *does*
@@ -87,6 +98,15 @@ hold your data. Being straight about what that means:
   including the GPS coordinates phones bury in every shot. A label photo taken
   at home does not quietly publish your address.
 - Sessions are opaque 256-bit tokens; only their hashes are stored.
+- **Photos are re-encoded in your browser before upload**, which strips EXIF —
+  including the GPS coordinates phones bury in every shot.
+- **Deletion works.** Settings → delete account removes your identity, pours,
+  notes, photos, lists and follows, including the R2 objects — not just the rows
+  pointing at them. Breweries and beers survive, because other people's pours
+  point at them; nothing left behind identifies you.
+
+The full policy lives at [`/privacy`](https://draught-5bp.pages.dev/privacy) and
+is written to be read rather than survived.
 
 ## Running it
 
@@ -139,7 +159,7 @@ door. `/api/auth/dev` 404s unless the flag is present.
 npm test
 ```
 
-Eleven tests over the pure parts: slug collision (the rule that decides when two
+Thirteen tests over the pure parts: slug collision (the rule that decides when two
 people have logged the same beer), input cleaning, handle validation, half-star
 rendering, HTML escaping, the integrity of the style canon, and a pinned regression for the link
 interceptor (a valueless `data-raw` attribute is `""`, so guarding on its
