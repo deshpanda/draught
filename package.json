@@ -1,0 +1,14 @@
+{
+  "name": "draught",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev --d1=DB --port 8788",
+    "db:local": "wrangler d1 execute draught --local --file=schema.sql",
+    "db:remote": "wrangler d1 execute draught --remote --file=schema.sql",
+    "test": "node --test tools/*.test.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
