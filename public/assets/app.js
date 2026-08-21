@@ -66,33 +66,29 @@ function renderNav() {
   const here = location.pathname;
   const on = (p) => (here === p ? ' class="on"' : '');
   if (!state.me) {
-    nav.innerHTML = `<a href="/recent"${on('/recent')}>Bar</a>
-      <a href="/map"${on('/map')}>Map</a>
+    nav.innerHTML = `<a href="/recent"${on('/recent')}>Everyone</a>
       <a href="/lists"${on('/lists')}>Lists</a>
+      <a href="/map"${on('/map')}>Map</a>
       <a class="cta" href="/api/auth/google" data-raw>Sign in</a>`;
     return;
   }
   const h = state.me.handle;
   nav.innerHTML = `
-    <a href="/feed"${on('/feed')}>Feed</a>
-    <a href="/recent"${on('/recent')}>Bar</a>
-    <a href="/map"${on('/map')}>Map</a>
+    <a href="/feed"${on('/feed')}>Following</a>
+    <a href="/recent"${on('/recent')}>Everyone</a>
     <a href="/lists"${on('/lists')}>Lists</a>
-    ${h ? `<a href="/@${esc(h)}"${on(`/@${h}`)}>Your shelf</a>` : ''}
-    <a href="/settings"${on('/settings')}>Settings</a>
-    <button id="signout">Sign out</button>
-    <a class="cta" href="/log">+ Log a beer</a>`;
-  nav.querySelector('#signout')?.addEventListener('click', async () => {
-    await api.logout().catch(() => {});
-    state.me = null; state.stats = null;
-    go('/');
-  });
+    <a href="/map"${on('/map')}>Map</a>
+    ${h ? `<a class="me" href="/@${esc(h)}"${on(`/@${h}`)}>${
+      state.me.avatar
+        ? `<img class="avatar" src="${esc(state.me.avatar)}" alt="" referrerpolicy="no-referrer">`
+        : ''}${esc(h)}</a>` : ''}
+    <a class="cta" href="/log">+ Log</a>`;
 }
 
 const loading = () => { app.innerHTML = '<p class="loading">pouring…</p>'; };
 const oops = (msg) => {
   app.innerHTML = `<div class="wrap"><div class="empty"><p>${esc(msg)}</p>
-    <a class="btn" href="/">Back to the bar</a></div></div>`;
+    <a class="btn" href="/">Go home</a></div></div>`;
 };
 
 // ---- views -----------------------------------------------------------------
@@ -101,26 +97,26 @@ function viewLanding() {
   app.innerHTML = `<div class="wrap"><section class="gate"><div class="gate-inner">
     <p class="glass">🍺</p>
     <h1>Draught</h1>
-    <p class="tag">your beer life, on draught</p>
-    <p class="pitch">Log the beer you drink. Rate it, remember it, and watch your
-      taste take shape — the beers, the breweries, the styles you keep coming back to.</p>
+    <p class="tag">Letterboxd, for beer</p>
+    <p class="pitch">Keep a diary of the beer you drink. Rate it, write a review,
+      make lists, and follow people whose taste you trust.</p>
     <div class="signin">
-      <a class="btn btn-amber btn-lg" href="/api/auth/google" data-raw>Continue with Google</a>
+      <a class="btn btn-amber btn-lg" href="/api/auth/google" data-raw>Sign in with Google</a>
     </div>
     ${isLocal ? '<p class="fine"><a href="/api/auth/dev?as=Local%20Drinker" data-raw>dev sign-in</a> (localhost only)</p>' : ''}
-    <p class="fine">Free. No ads, no badges, no streaks to keep.<br>
-      Your handle and your pours are public; nothing else is.</p>
+    <p class="fine">Free. No ads, no badges, no streaks.<br>
+      Your username and the beers you log are public. Nothing else is.</p>
 
     <div class="threeup">
-      <div><h4>A pour, not a check-in</h4>
-        <p>Half-star ratings, a date, and room for what you actually thought.
-          Notes are the point, not an afterthought.</p></div>
-      <div><h4>Every beer has a page</h4>
-        <p>The first person to log a beer creates its page. Everyone's ratings
-          and notes gather there — one shared record per beer.</p></div>
-      <div><h4>Your taste, in the open</h4>
-        <p>117 styles across 13 families, from Czech pale lager to Flanders red.
-          Your shelf shows which ones you actually drink.</p></div>
+      <div><h4>Rate and review</h4>
+        <p>Half stars, a date, a photo, and room to say what it actually tasted
+          like. The review is the point.</p></div>
+      <div><h4>One page per beer</h4>
+        <p>Everyone's ratings and reviews gather on the same page, so you can see
+          what a beer is really like before you buy it.</p></div>
+      <div><h4>Follow people</h4>
+        <p>See what your friends are drinking. 117 beer styles tracked, so your
+          profile shows what you actually go for.</p></div>
     </div>
   </div></section></div>`;
 }
@@ -134,8 +130,7 @@ async function viewHome() {
 function viewWelcome() {
   if (!state.me) return viewLanding();
   app.innerHTML = `<div class="wrap">
-    <section class="hero"><p class="kicker">one more thing</p>
-      <h2>Pick a <em>handle</em></h2>
+    <section class="hero"><h2>Pick a username</h2>
       <p>It's your address here — <code>draught/@you</code> — and it's the only
         part of your account anyone else sees. Letters, numbers, underscore.</p></section>
     <section class="block"><div class="panel" style="max-width:440px">
@@ -185,8 +180,7 @@ function viewLog() {
   if (!state.me.handle) return go('/welcome', { replace: true });
 
   app.innerHTML = `<div class="wrap">
-    <section class="hero"><p class="kicker">a new pour</p>
-      <h2>What are you <em>drinking</em>?</h2></section>
+    <section class="hero"><h2>Log a beer</h2></section>
     <section class="block"><div class="panel" style="max-width:620px">
       <form id="pform" autocomplete="off">
         <div class="field">
@@ -488,30 +482,30 @@ async function viewProfile(handle) {
     </section>
 
     <div class="tiles">
-      ${tile('pours', stats.pours ?? 0)}
-      ${tile('distinct beers', stats.beers ?? 0)}
+      ${tile('logged', stats.pours ?? 0)}
+      ${tile('beers', stats.beers ?? 0)}
       ${tile('breweries', stats.breweries ?? 0)}
       ${tile('styles', stats.styles ?? 0)}
-      ${tile('mean rating', stats.avg ? `${outOfFive(stats.avg)}★` : '—', stats.avg ? 'of five' : 'nothing rated yet')}
+      ${tile('average', stats.avg ? `${outOfFive(stats.avg)}★` : '—', stats.avg ? 'out of 5' : 'nothing rated yet')}
     </div>
 
     ${pours.some((p) => p.photo_key) ? `<section class="block">
-      ${blockHead('the wall', 'what they poured')}
+      ${blockHead('Photos')}
       <div class="wall">${pours.filter((p) => p.photo_key).slice(0, 24).map((p) =>
         `<a class="wtile" href="/b/${encodeURIComponent(p.brewery_slug)}/${encodeURIComponent(p.beer_slug)}"
           title="${esc(p.beer)} — ${esc(p.brewery)}">${photoImg(p.photo_key)}</a>`).join('')}</div>
     </section>` : ''}
 
     ${styles.length ? `<section class="block">
-      ${blockHead('the styles they drink', `${styles.length} of 117`)}
+      ${blockHead('Styles', `${styles.length} of 117`)}
       <div class="chips">${styles.map((s) => `<span class="chip">${esc(s.style)}<span class="n">${s.n}</span></span>`).join('')}</div>
     </section>` : ''}
 
     <section class="block">
-      ${blockHead(mine ? 'your ledger' : 'the ledger', pours.length ? plural(pours.length, 'pour') : '')}
+      ${blockHead('Diary', pours.length ? plural(pours.length, 'entry', 'entries') : '')}
       ${pours.length
         ? `<ul class="pours" id="ledger">${pours.map((p) => pourRow(p, { mine })).join('')}</ul>`
-        : `<div class="empty"><p>${mine ? 'Nothing logged yet.' : 'This shelf is empty.'}</p>
+        : `<div class="empty"><p>${mine ? 'Nothing logged yet.' : 'Nothing logged yet.'}</p>
             ${mine ? '<a class="btn btn-amber" href="/log">Log your first beer</a>' : ''}</div>`}
     </section>
   </div>`;
@@ -555,13 +549,13 @@ async function viewBeer(brewerySlug, beerSlug) {
     </section>
 
     <div class="tiles">
-      ${tile('mean rating', stats.avg ? `${outOfFive(stats.avg)}★` : '—', stats.rated ? `${plural(stats.rated, 'rating')}` : 'unrated so far')}
-      ${tile('pours', stats.pours ?? 0)}
-      ${tile('drinkers', stats.drinkers ?? 0)}
+      ${tile('average', stats.avg ? `${outOfFive(stats.avg)}★` : '—', stats.rated ? `${plural(stats.rated, 'rating')}` : 'no ratings yet')}
+      ${tile('logged', stats.pours ?? 0)}
+      ${tile('people', stats.drinkers ?? 0)}
     </div>
 
     ${stats.rated ? `<section class="block">
-      ${blockHead('how it rates', 'half-stars, 0.5 to 5')}
+      ${blockHead('Ratings')}
       <div class="panel">
         <div class="hist">${counts.map((n, i) =>
           `<div class="col${n ? '' : ' nil'}" style="height:${Math.round((n / peak) * 100)}%"
@@ -571,13 +565,13 @@ async function viewBeer(brewerySlug, beerSlug) {
     </section>` : ''}
 
     <section class="block">
-      ${blockHead('the margins', pours.length ? plural(pours.length, 'pour') : '')}
+      ${blockHead('Reviews', pours.length ? plural(pours.length, 'entry', 'entries') : '')}
       ${pours.length
         ? `<ul class="pours">${pours.map((p) => pourRow({
             ...p, beer: beer.name, beer_slug: beer.slug,
             brewery: beer.brewery, brewery_slug: beer.brewerySlug,
           }, { who: true })).join('')}</ul>`
-        : '<div class="empty"><p>Nobody has written anything down yet.</p></div>'}
+        : '<div class="empty"><p>No reviews yet.</p></div>'}
     </section>
 
     <div class="beer-acts">
@@ -640,13 +634,12 @@ async function viewRecent() {
   let data;
   try { data = await api.recent(); } catch (err) { return oops(err.message); }
   app.innerHTML = `<div class="wrap">
-    <section class="hero"><p class="kicker">the bar</p>
-      <h2>What people are <em>drinking</em></h2>
-      <p>The last forty pours logged on Draught.</p></section>
+    <section class="hero"><h2>Everyone</h2>
+      <p>The last forty beers logged on Draught.</p></section>
     <section class="block">
       ${data.pours.length
         ? `<ul class="pours">${data.pours.map((p) => pourRow(p, { who: true })).join('')}</ul>`
-        : `<div class="empty"><p>Nothing poured yet. Be the first.</p>
+        : `<div class="empty"><p>Nothing logged yet. Be the first.</p>
             ${state.me ? '<a class="btn btn-amber" href="/log">Log a beer</a>' : ''}</div>`}
     </section>
   </div>`;
@@ -655,7 +648,7 @@ async function viewRecent() {
 function viewSettings() {
   if (!state.me) return viewLanding();
   app.innerHTML = `<div class="wrap">
-    <section class="hero"><p class="kicker">settings</p><h2>Your <em>account</em></h2></section>
+    <section class="hero"><h2>Settings</h2></section>
     <section class="block"><div class="panel" style="max-width:520px">
       <form id="sform">
         <div class="field">
@@ -665,7 +658,7 @@ function viewSettings() {
         <div class="field">
           <label for="bio">Bio</label>
           <textarea id="bio" name="bio" maxlength="240">${esc(state.me.bio || '')}</textarea>
-          <p class="hint">240 characters. Shown on your shelf.</p>
+          <p class="hint">240 characters. Shown on your profile.</p>
         </div>
         <div class="field">
           <label>Handle</label>
@@ -678,7 +671,15 @@ function viewSettings() {
     </div></section>
 
     <section class="block">
-      ${blockHead('leaving')}
+      ${blockHead('Account')}
+      <div class="panel" style="max-width:520px">
+        <p class="hint" style="margin:0 0 12px">Signed in as <strong>@${esc(state.me.handle || '')}</strong>.</p>
+        <button class="btn" id="signout">Sign out</button>
+      </div>
+    </section>
+
+    <section class="block">
+      ${blockHead('Delete account')}
       <div class="panel danger" style="max-width:520px">
         <p>Deleting your account removes your handle, pours, notes, photos, lists and
           follows — the photo files as well, not just the rows. It cannot be undone.</p>
@@ -706,6 +707,12 @@ function viewSettings() {
 
   // Deliberate friction: typing the handle is the difference between a misclick
   // and a decision, and this one erases photos that cannot come back.
+  app.querySelector('#signout')?.addEventListener('click', async () => {
+    await api.logout().catch(() => {});
+    state.me = null; state.stats = null;
+    go('/');
+  });
+
   app.querySelector('#nuke')?.addEventListener('click', async () => {
     const dmsg = app.querySelector('#dmsg');
     const typed = prompt(`This erases everything. Type your handle (${state.me.handle}) to confirm.`);
@@ -734,16 +741,15 @@ async function viewFeed() {
 
   const empty = !data.pours.length;
   app.innerHTML = `<div class="wrap">
-    <section class="hero"><p class="kicker">your table</p>
-      <h2>What you and yours are <em>drinking</em></h2>
+    <section class="hero"><h2>Following</h2>
       <p>${data.following
-        ? `Pours from the ${plural(data.following, 'person', 'people')} you follow, and your own.`
-        : 'Follow a few drinkers and their pours land here.'}</p></section>
+        ? `Beers logged by the ${plural(data.following, 'person', 'people')} you follow, and by you.`
+        : 'Follow someone and the beers they log will show up here.'}</p></section>
     <section class="block">
       ${empty
         ? `<div class="empty">
-            <p>${data.following ? 'Nothing new from your table yet.' : 'You are not following anyone yet.'}</p>
-            <a class="btn btn-amber" href="/recent">Find people at the bar</a>
+            <p>${data.following ? 'Nothing new yet.' : 'You are not following anyone yet.'}</p>
+            <a class="btn btn-amber" href="/recent">See what everyone's drinking</a>
             <a class="btn" href="/log">Log a beer</a>
           </div>`
         : `<ul class="pours">${data.pours.map((p) => pourRow(p, { who: true })).join('')}</ul>`}
@@ -757,7 +763,7 @@ async function viewPeople(handle, dir) {
   try { data = await api.people(handle, dir); } catch (err) { return oops(err.message); }
   app.innerHTML = `<div class="wrap">
     <section class="hero"><p class="kicker">@${esc(handle)}</p>
-      <h2>${dir === 'followers' ? 'Followers' : '<em>Following</em>'}</h2></section>
+      <h2>${dir === 'followers' ? 'Followers' : 'Following'}</h2></section>
     <section class="block">
       ${data.people.length
         ? `<div class="folk">${data.people.map((u) => `
@@ -781,7 +787,7 @@ async function viewUserLists(handle) {
 
   app.innerHTML = `<div class="wrap">
     <section class="hero"><p class="kicker">@${esc(data.handle)}</p>
-      <h2>${mine ? 'Your <em>lists</em>' : 'Lists'}</h2></section>
+      <h2>Lists</h2></section>
     ${mine ? `<section class="block"><form id="newList" class="picker-new">
         <input id="ltitle" placeholder="New list — e.g. Best stouts of 2026" maxlength="80" required>
         <label class="rank-toggle"><input type="checkbox" id="lranked"> ranked</label>
@@ -823,7 +829,7 @@ async function viewList(handle, slug) {
       ${list.description ? `<p>${esc(list.description)}</p>` : ''}
     </section>
     <section class="block">
-      ${blockHead('the list', plural(items.length, 'beer'))}
+      ${blockHead('Beers', plural(items.length, 'beer'))}
       ${items.length
         ? `<ol class="litems${list.ranked ? ' ranked' : ''}" id="litems">${items.map((it, i) => `
             <li>
@@ -869,9 +875,8 @@ async function viewAllLists() {
   let data;
   try { data = await api.recentLists(); } catch (err) { return oops(err.message); }
   app.innerHTML = `<div class="wrap">
-    <section class="hero"><p class="kicker">the library</p>
-      <h2>Lists people are <em>keeping</em></h2>
-      <p>Collections and rankings from across Draught.</p></section>
+    <section class="hero"><h2>Lists</h2>
+      <p>Collections and rankings from everyone on Draught.</p></section>
     <section class="block">
       ${data.lists.length
         ? `<div class="lists">${data.lists.map((l) => `
@@ -889,8 +894,7 @@ async function viewAllLists() {
 
 function viewPrivacy() {
   app.innerHTML = `<div class="wrap prose">
-    <section class="hero"><p class="kicker">privacy</p>
-      <h2>What Draught <em>knows</em></h2>
+    <section class="hero"><h2>Privacy</h2>
       <p>Written to be read, not to be survived. If anything below is unclear,
         that's a bug in the writing — say so.</p></section>
 
@@ -1026,8 +1030,7 @@ async function viewMap() {
   const top = [...data.venues].sort((a, b) => b.pours - a.pours).slice(0, 12);
 
   app.innerHTML = `<div class="wrap">
-    <section class="hero"><p class="kicker">the map</p>
-      <h2>Where it's being <em>drunk</em></h2>
+    <section class="hero"><h2>Map</h2>
       <p>${scope === 'following'
         ? 'Places you and the people you follow have logged a beer.'
         : scope === 'all' ? 'Every pinned venue on Draught.'
@@ -1050,7 +1053,7 @@ async function viewMap() {
     </section>
 
     ${top.length ? `<section class="block">
-      ${blockHead('the locals', plural(data.venues.length, 'venue'))}
+      ${blockHead('Top venues', plural(data.venues.length, 'place'))}
       <ul class="tally">${top.map((v, i) => `
         <li><span class="n">${i + 1}</span>
           <span class="name">${esc(v.name)}${
@@ -1062,7 +1065,7 @@ async function viewMap() {
     </section>` : ''}
 
     ${data.origins.length ? `<section class="block">
-      ${blockHead('where the beer is from', 'by brewery country')}
+      ${blockHead('Countries')}
       <div class="chips">${data.origins.slice(0, 20).map((o) =>
         `<span class="chip">${esc(o.country)}<span class="n">${o.pours}</span></span>`).join('')}</div>
     </section>` : ''}

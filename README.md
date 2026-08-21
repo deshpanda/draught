@@ -1,6 +1,6 @@
 # Draught
 
-**Your beer life, on draught.**
+**A diary for the beer you drink.** Letterboxd, for beer.
 
 **Live: [ondraught.pages.dev](https://ondraught.pages.dev)**
 
@@ -32,16 +32,16 @@ Draught takes that axis:
 
 | Route | What's there |
 | --- | --- |
-| `/` | Signed out: the pitch. Signed in: your feed |
-| `/feed` | Your table — pours from the people you follow, and your own |
+| `/` | Signed out: the pitch. Signed in: Following |
+| `/feed` | **Following** — beers logged by people you follow, and by you |
 | `/log` | The one form that matters — brewery, beer, style, half-stars, photo, notes |
-| `/@handle` | A drinker's shelf: totals, the wall of their photos, styles, the full ledger |
+| `/@handle` | A profile: totals, photos, styles, and the full diary |
 | `/@handle/lists` · `/@handle/list/:slug` | Their lists, and one list in full |
 | `/@handle/followers` · `/following` | Who's at whose table |
 | `/b/:brewery/:beer` | A beer's page: hero photo, mean rating, histogram, the margins |
 | `/map` | The map — pinned venues, filtered to everyone, your people, or just you |
-| `/recent` | The bar — the last forty pours logged, by anyone |
-| `/lists` | The library — lists from across Draught |
+| `/recent` | **Everyone** — the last forty beers logged, by anyone |
+| `/lists` | **Lists** — collections and rankings from everyone |
 | `/settings` | Display name and bio |
 
 ## Architecture

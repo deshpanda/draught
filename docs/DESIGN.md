@@ -165,31 +165,41 @@ of a later keystroke.
 
 ## The look
 
-Plain and legible, in three rules, in order of importance.
+**Modelled on Letterboxd, deliberately.** That is the thing being asked for, and
+two attempts at being distinctive — a warm amber-on-black theme, then a light
+editorial one in EB Garamond — both read worse than the obvious answer.
 
-**1. Readability first.** The system font stack and nothing else — no webfont at
-all, so there is nothing to download, nothing to swap and nothing to misrender.
-Sentence case, ordinary sizes, no letterspaced small caps. An earlier pass set
-the whole interface in EB Garamond; it was handsome and it read badly, which is
-the wrong trade for a thing you scan every day.
+Dark, cool, dense. `--bg #14181c`, panels `#2c3440`, text `#f4f7f9`, secondary
+`#9ab`. System font stack, no webfont. Small radii, tight rows, uppercase
+micro-labels for section headers and nothing else shouting.
 
-**2. Amber means state.** Amber is never decoration. It marks exactly four
-things: a rating, the page you are on, the primary action, and a count. Beer
-titles, list titles and body links are ink and turn amber only on hover. This is
-the rule that makes the one accent legible — when every title was amber, the
-colour carried no information. Enforced by a check that walks every rendered
-text node: amber-as-text appears only on `.stars`, `.rank`, `.chip .n` and
-`.tally .count`.
+**One accent: amber `#f0a83c`** (9.4:1 on the background), and it means *state* —
+a rating, the page you are on, the primary action, a count. Nothing else is
+coloured. Verified by walking every rendered text node across all routes.
 
-**3. No devices.** No hanging punctuation, no rule-only tiles, no faux small
-caps. Each one cost a beat of comprehension for a visual idea nobody asked for.
-Links are not underlined in lists either — underlining every beer title turns a
-ledger into a wall of rules; weight and hover carry them, and prose keeps its
-underlines where a link has to be findable mid-sentence.
+### Say what things are
 
-Light by default, dark when the OS asks; both are the same design, one token
-block apart. 428 lines of CSS, which is roughly a quarter of what the discarded
-editorial treatment needed.
+The bigger fix was language, not colour. The interface had invented a private
+vocabulary: "the Bar" for everyone's activity, "your shelf" for your own diary,
+plus "the ledger", "the margins", "the wall", "the locals", "the library". Every
+one of those required the reader to learn a metaphor before they could navigate.
+
+Now:
+
+| Was | Is |
+| --- | --- |
+| Feed / Bar | **Following** / **Everyone** |
+| Your shelf | your username |
+| the ledger | **Diary** |
+| the margins | **Reviews** |
+| the wall | **Photos** |
+| the locals | **Top venues** |
+| the library | **Lists** |
+| pours | **entries**, or just "beers logged" |
+
+The nav also shed two items: Settings and Sign out moved onto the settings page,
+reached by clicking your own name. Six items became five, and the five are words
+anyone can read cold.
 
 ## Explicit non-goals
 
