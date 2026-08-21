@@ -21,6 +21,8 @@
 //   GET    /api/pours/:id/comments     POST to add
 //   DELETE /api/comments/:id           your own only
 //   GET    /api/tags/:tag              everything tagged with it
+//   GET    /api/stats                  public aggregate counts
+//   GET    /api/badge?metric=…         the same, as a shields.io endpoint
 //   GET    /api/users/:handle
 //   GET    /api/beers/:brewery/:beer
 //   GET    /api/recent
@@ -240,6 +242,11 @@ export async function onRequest(context) {
       const u = await requireUser(request, env);
       return s2.deleteComment(env, u, route[1]);
     }
+
+    // HEAD too: these are the endpoints uptime monitors and image proxies probe.
+    const read = method === 'GET' || method === 'HEAD';
+    if (route[0] === 'stats' && read) return stats(env);
+    if (route[0] === 'badge' && read) return badge(env, url.searchParams.get('metric'));
 
     if (route[0] === 'tags' && route[1] && method === 'GET') {
       return s2.tagPage(env, decodeURIComponent(route[1]));
@@ -700,6 +707,48 @@ async function beerPage(env, brewerySlug, beerSlug, viewer) {
     viewer: viewerMarks,
     histogram: hist, pours: pours.results,
   });
+}
+
+// Public aggregate counts. Nothing here identifies anyone — they are the four
+// numbers you'd put on a README, and they are cached at the edge because a
+// badge in a README gets fetched by every visitor's proxy.
+const STATS_SQL = `
+  SELECT (SELECT COUNT(*) FROM users WHERE handle IS NOT NULL) AS drinkers,
+         (SELECT COUNT(*) FROM pours)                          AS logged,
+         (SELECT COUNT(*) FROM beers)                          AS beers,
+         (SELECT COUNT(*) FROM breweries)                      AS breweries`;
+
+const CACHE = { 'cache-control': 'public, max-age=60, s-maxage=600' };
+
+async function stats(env) {
+  const row = await env.DB.prepare(STATS_SQL).first();
+  return json({
+    drinkers: row?.drinkers ?? 0,
+    logged: row?.logged ?? 0,
+    beers: row?.beers ?? 0,
+    breweries: row?.breweries ?? 0,
+  }, 200, CACHE);
+}
+
+// shields.io endpoint format: https://shields.io/badges/endpoint-badge
+const BADGES = {
+  drinkers: 'drinkers',
+  logged: 'beers logged',
+  beers: 'distinct beers',
+  breweries: 'breweries',
+};
+
+async function badge(env, metric) {
+  const key = BADGES[metric] ? metric : 'logged';
+  const row = await env.DB.prepare(STATS_SQL).first();
+  return json({
+    schemaVersion: 1,
+    label: BADGES[key],
+    message: String(row?.[key] ?? 0),
+    color: 'e5a33e',
+    // shields will not poll faster than this, so it is also our floor.
+    cacheSeconds: 600,
+  }, 200, CACHE);
 }
 
 // One box, three kinds of answer. Beers rank first because that is what people

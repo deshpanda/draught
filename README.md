@@ -2,6 +2,19 @@
 
 **A diary for the beer you drink.** Letterboxd, for beer.
 
+[![drinkers](https://img.shields.io/endpoint?url=https%3A%2F%2Fondraught.pages.dev%2Fapi%2Fbadge%3Fmetric%3Ddrinkers&style=flat-square)](https://ondraught.pages.dev/recent)
+[![beers logged](https://img.shields.io/endpoint?url=https%3A%2F%2Fondraught.pages.dev%2Fapi%2Fbadge%3Fmetric%3Dlogged&style=flat-square)](https://ondraught.pages.dev/recent)
+[![distinct beers](https://img.shields.io/endpoint?url=https%3A%2F%2Fondraught.pages.dev%2Fapi%2Fbadge%3Fmetric%3Dbeers&style=flat-square)](https://ondraught.pages.dev/search)
+[![breweries](https://img.shields.io/endpoint?url=https%3A%2F%2Fondraught.pages.dev%2Fapi%2Fbadge%3Fmetric%3Dbreweries&style=flat-square)](https://ondraught.pages.dev/search)
+[![checks](https://github.com/deshpanda/draught/actions/workflows/checks.yml/badge.svg)](https://github.com/deshpanda/draught/actions/workflows/checks.yml)
+
+Those four are live, not hand-typed — `GET /api/badge?metric=…` returns
+[shields.io endpoint JSON](https://shields.io/badges/endpoint-badge) straight out
+of the database. `GET /api/stats` returns the same numbers as plain JSON if you'd
+rather read them directly. Both are aggregate only; nothing there identifies
+anyone, and `drinkers` counts people who finished signing up by claiming a
+username.
+
 **Live: [ondraught.pages.dev](https://ondraught.pages.dev)**
 
 Log the beer you drink. Rate it in half-stars, write down what you actually

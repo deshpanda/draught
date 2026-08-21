@@ -177,3 +177,19 @@ test('map fallback must not hinge on a removed MapLibre API', () => {
   assert.ok(!/if\s*\(!\s*maplibregl\.supported/.test(src), 'must not gate on the removed API');
   assert.ok(src.includes('if (!hasWebGl())'), 'it should test the real capability');
 });
+
+test('badge output is valid shields.io endpoint JSON', () => {
+  // The shape shields.io requires: schemaVersion must be exactly 1, and
+  // `message` must be a string — a number renders as an empty badge.
+  const badge = (label, n) => ({
+    schemaVersion: 1, label, message: String(n), color: 'e5a33e', cacheSeconds: 600,
+  });
+  const b = badge('beers logged', 45);
+  assert.equal(b.schemaVersion, 1);
+  assert.equal(typeof b.message, 'string', 'shields renders a numeric message as blank');
+  assert.equal(typeof b.label, 'string');
+  assert.match(b.color, /^[0-9a-f]{6}$/, 'hex without a leading #');
+  assert.ok(b.cacheSeconds >= 300, 'shields clamps below 300s anyway');
+  // zero must still render, not fall back to a default
+  assert.equal(badge('drinkers', 0).message, '0');
+});
