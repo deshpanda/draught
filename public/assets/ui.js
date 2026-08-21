@@ -60,6 +60,8 @@ export function pourRow(p, { who = false, mine = false } = {}) {
       </span>` : ''}
     </span>
     ${p.note ? `<p class="note">${esc(p.note)}</p>` : ''}
+    ${p.tags?.length ? `<p class="tagrow">${p.tags.map((t) =>
+      `<a class="tag" href="/tag/${encodeURIComponent(t.tag)}">${esc(t.label)}</a>`).join('')}</p>` : ''}
   </li>`;
 }
 
@@ -284,3 +286,19 @@ export const COMMON_STYLES = [
   'German Pils', 'Munich Helles', 'Witbier', 'Weissbier',
   'Irish Stout', 'Imperial Stout', 'Saison', 'Gueuze',
 ];
+
+
+// Four pinned beers. Empty slots are shown deliberately — a half-filled row of
+// favourites invites you to finish it, where four blanks would just look broken.
+export function favouriteSlots(favs, mine) {
+  const slots = [...favs];
+  while (mine && slots.length < 4) slots.push(null);
+  return `<div class="favs">${slots.map((f) => f
+    ? `<a class="fav" href="/b/${encodeURIComponent(f.brewery_slug)}/${encodeURIComponent(f.slug)}">
+        <span class="favpic">${f.photo_key ? photoImg(f.photo_key) : '<span class="favnone">▤</span>'}</span>
+        <span class="favname">${esc(f.name)}</span>
+        <span class="favby">${esc(f.brewery)}</span>
+      </a>`
+    : `<span class="fav empty"><span class="favpic"><span class="favnone">+</span></span>
+        <span class="favby">open any beer to pin it</span></span>`).join('')}</div>`;
+}

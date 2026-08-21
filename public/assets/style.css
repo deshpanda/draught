@@ -422,3 +422,43 @@ button.chip { font: inherit; cursor: pointer; }
 .editrow { padding: 0 0 14px !important; border-bottom: 1px solid var(--line) !important; }
 .editrow .panel { max-width: 560px; }
 .pours .again { color: var(--faint); margin-left: 5px; font-size: 0.85em; }
+
+/* ---------- favourites ---------- */
+/* Capped rather than 1fr: at full width four empty placeholders were ~215px
+   each and swamped the page. */
+.favs { display: grid; grid-template-columns: repeat(4, minmax(0, 148px)); gap: 12px; }
+@media (max-width: 620px) { .favs { grid-template-columns: repeat(2, 1fr); } }
+.fav { display: block; color: var(--text); }
+.fav .favpic { display: grid; place-items: center; aspect-ratio: 1; border-radius: var(--r);
+  overflow: hidden; background: var(--surface-2); margin-bottom: 6px; }
+.fav .favpic img { width: 100%; height: 100%; object-fit: cover; }
+.fav .favnone { color: var(--faint); font-size: 1.4rem; }
+.fav .favname { display: block; font-weight: 700; font-size: 0.88rem; line-height: 1.25; }
+.fav .favby { display: block; font-size: 0.78rem; color: var(--faint); }
+.fav:hover .favpic { outline: 2px solid var(--amber); }
+.fav.empty { opacity: 0.5; }
+.btn.on { background: var(--amber); color: var(--on-amber); }
+
+/* ---------- tags ---------- */
+.tagrow { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0 0; }
+.tagrow .tag { margin-left: 0; font-size: 0.74rem; }
+a.tag:hover { border-color: var(--amber); }
+
+/* ---------- review likes + comments ---------- */
+.revfoot { display: flex !important; align-items: center; gap: 14px; padding: 0 0 12px !important;
+  border-bottom: 1px solid var(--line) !important; }
+.revfoot .thread { flex-basis: 100%; }
+.revlike, .revcom { font: inherit; font-size: 0.8rem; color: var(--faint); background: none;
+  border: 0; cursor: pointer; padding: 0; display: inline-flex; align-items: center; gap: 5px; }
+.revlike:hover, .revcom:hover { color: var(--text); }
+.revlike.on { color: var(--amber); }
+.revlike:disabled { cursor: default; }
+.comments { list-style: none; margin: 10px 0 0; padding: 0; }
+.comments li { padding: 7px 0; border-top: 1px solid var(--line); font-size: 0.88rem;
+  display: flex; gap: 8px; align-items: baseline; }
+.comments a { font-weight: 600; white-space: nowrap; }
+.comments .cbody { color: var(--muted); flex: 1; }
+.cform { display: flex; gap: 8px; margin-top: 10px; }
+.cform input { flex: 1; font: inherit; font-size: 0.88rem; padding: 8px 10px; color: var(--text);
+  background: var(--surface-2); border: 1px solid transparent; border-radius: var(--r); }
+.cform input:focus { outline: 0; border-color: var(--amber); }

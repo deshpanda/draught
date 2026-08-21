@@ -16,6 +16,11 @@
 //   POST   /api/mark/:kind/:brewery/:beer   kind = like | want; DELETE to undo
 //   GET    /api/users/:handle/wishlist  and .../likes
 //   GET    /api/styles/:name           the genre page of a beer app
+//   POST   /api/fav/:brewery/:beer     four pinned beers; DELETE to unpin
+//   POST   /api/pours/:id/like         like a review; DELETE to unlike
+//   GET    /api/pours/:id/comments     POST to add
+//   DELETE /api/comments/:id           your own only
+//   GET    /api/tags/:tag              everything tagged with it
 //   GET    /api/users/:handle
 //   GET    /api/beers/:brewery/:beer
 //   GET    /api/recent
@@ -53,6 +58,7 @@ import * as venues from '../_shared/venues.js';
 import * as places from '../_shared/places.js';
 import * as tiles from '../_shared/tiles.js';
 import * as marks from '../_shared/marks.js';
+import * as s2 from '../_shared/social2.js';
 
 export async function onRequest(context) {
   const { request, env, params } = context;
@@ -152,9 +158,11 @@ export async function onRequest(context) {
     }
 
     // ---- pours -----------------------------------------------------------
-    if (route[0] === 'pours' && method === 'POST') {
+    // `!route[1]` matters: without it this swallows /pours/:id/like and
+    // /pours/:id/comments and tries to log a beer from their bodies.
+    if (route[0] === 'pours' && !route[1] && method === 'POST') {
       const u = await requireUser(request, env);
-      if (!u.handle) return bad('Claim a handle first.', 409);
+      if (!u.handle) return bad('Claim a username first.', 409);
       const capped = await guard(env, 'pour', u.id);
       if (capped) return capped;
       return logPour(env, u, await request.json().catch(() => ({})));
@@ -200,6 +208,41 @@ export async function onRequest(context) {
       const capped = await guard(env, 'followAct', u.id);
       if (capped) return capped;
       return marks.toggle(env, u, route[1], route[2], route[3], method === 'POST');
+    }
+
+    if (route[0] === 'fav' && route[1] && route[2] && (method === 'POST' || method === 'DELETE')) {
+      const u = await requireUser(request, env);
+      if (!u.handle) return bad('Claim a username first.', 409);
+      return s2.favourite(env, u, route[1], route[2], method === 'POST');
+    }
+
+    if (route[0] === 'pours' && route[1] && route[2] === 'like'
+        && (method === 'POST' || method === 'DELETE')) {
+      const u = await requireUser(request, env);
+      if (!u.handle) return bad('Claim a username first.', 409);
+      const capped = await guard(env, 'followAct', u.id);
+      if (capped) return capped;
+      return s2.likeReview(env, u, route[1], method === 'POST');
+    }
+
+    if (route[0] === 'pours' && route[1] && route[2] === 'comments') {
+      if (method === 'GET') return s2.comments(env, route[1]);
+      if (method === 'POST') {
+        const u = await requireUser(request, env);
+        if (!u.handle) return bad('Claim a username first.', 409);
+        const capped = await guard(env, 'listItem', u.id);
+        if (capped) return capped;
+        return s2.addComment(env, u, route[1], await request.json().catch(() => ({})));
+      }
+    }
+
+    if (route[0] === 'comments' && route[1] && method === 'DELETE') {
+      const u = await requireUser(request, env);
+      return s2.deleteComment(env, u, route[1]);
+    }
+
+    if (route[0] === 'tags' && route[1] && method === 'GET') {
+      return s2.tagPage(env, decodeURIComponent(route[1]));
     }
 
     if (route[0] === 'styles' && route[1] && method === 'GET') {
@@ -396,6 +439,8 @@ async function logPour(env, user, body) {
       .bind(photoKey, beer.id).run();
   }
 
+  if (body.tags !== undefined) await s2.setTags(env, res.meta.last_row_id, body.tags);
+
   return json({
     id: res.meta.last_row_id,
     beer: { name: beer.name, slug: beer.slug, style: beer.style, abv: beer.abv ?? abv },
@@ -445,6 +490,8 @@ async function editPour(env, user, rawId, body) {
     await env.DB.prepare('UPDATE beers SET photo_key = ? WHERE id = ? AND photo_key IS NULL')
       .bind(photoKey, pour.beer_id).run();
   }
+
+  if (body.tags !== undefined) await s2.setTags(env, id, body.tags);
 
   return json({ ok: true, id, rating, drunkOn });
 }
@@ -513,6 +560,10 @@ async function eraseAccount(env, user, secure) {
     env.DB.prepare('DELETE FROM follows WHERE follower_id = ? OR followee_id = ?').bind(user.id, user.id),
     env.DB.prepare('DELETE FROM wishlist WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM likes WHERE user_id = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM favourites WHERE user_id = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM review_likes WHERE user_id = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM comments WHERE user_id = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM pour_tags WHERE pour_id IN (SELECT id FROM pours WHERE user_id = ?)').bind(user.id),
     env.DB.prepare('DELETE FROM pours WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM rate_limits WHERE bucket LIKE ?').bind(`%:${user.id}`),
@@ -563,7 +614,7 @@ async function profile(env, handle, viewer) {
   const u = await env.DB.prepare('SELECT * FROM users WHERE handle = ?').bind(h).first();
   if (!u) return bad('No such drinker.', 404);
 
-  const [pours, stats, styles, counts, follows, listCount, marked] = await Promise.all([
+  const [pours, stats, styles, counts, follows, listCount, marked, favs, tags] = await Promise.all([
     env.DB.prepare(
       `SELECT p.id, p.rating, p.note, p.drunk_on, p.serving, p.venue, p.photo_key,
               p.again, p.geo_private, p.edited_at,
@@ -585,7 +636,12 @@ async function profile(env, handle, viewer) {
       `SELECT (SELECT COUNT(*) FROM wishlist WHERE user_id = ?1) AS wants,
               (SELECT COUNT(*) FROM likes WHERE user_id = ?1) AS likes`
     ).bind(u.id).first(),
+    s2.favouritesOf(env, u.id),
+    s2.topTags(env, u.id),
   ]);
+
+  const tagMap = await s2.tagsFor(env, pours.results.map((p) => p.id));
+  for (const p of pours.results) p.tags = tagMap[p.id] || [];
 
   return json({
     user: publicUser(u),
@@ -594,6 +650,8 @@ async function profile(env, handle, viewer) {
     viewerFollows: follows,
     isSelf: !!viewer && viewer.id === u.id,
     styles: styles.results,
+    favourites: favs.favourites,
+    tags,
     pours: pours.results,
   });
 }
@@ -616,12 +674,16 @@ async function beerPage(env, brewerySlug, beerSlug, viewer) {
        FROM pours WHERE beer_id = ?`
     ).bind(beer.id).first(),
     env.DB.prepare(
-      `SELECT p.rating, p.note, p.drunk_on, p.serving, p.photo_key, p.again,
-              u.handle, u.name AS drinker, u.avatar
+      `SELECT p.id, p.rating, p.note, p.drunk_on, p.serving, p.photo_key, p.again,
+              u.handle, u.name AS drinker, u.avatar,
+              (SELECT COUNT(*) FROM review_likes rl WHERE rl.pour_id = p.id) AS likes,
+              (SELECT COUNT(*) FROM comments c WHERE c.pour_id = p.id) AS comments,
+              EXISTS(SELECT 1 FROM review_likes rl2
+                     WHERE rl2.pour_id = p.id AND rl2.user_id = ?2) AS liked
        FROM pours p JOIN users u ON u.id = p.user_id
-       WHERE p.beer_id = ? AND u.handle IS NOT NULL
+       WHERE p.beer_id = ?1 AND u.handle IS NOT NULL
        ORDER BY (p.note != '') DESC, p.drunk_on DESC, p.id DESC LIMIT 50`
-    ).bind(beer.id).all(),
+    ).bind(beer.id, viewer?.id ?? '').all(),
   ]);
 
   const { results: hist } = await env.DB.prepare(

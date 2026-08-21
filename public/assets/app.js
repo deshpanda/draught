@@ -6,7 +6,7 @@ import {
   esc, stars, outOfFive, fmtDate, today, plural,
   tile, blockHead, pourRow, starRail, bindStarRail, bindAutocomplete,
   prepPhoto, photoImg, followBtn, bindFollow, listCard, askLocation, mapSvg,
-  beerRow, COMMON_STYLES,
+  beerRow, COMMON_STYLES, favouriteSlots,
 } from './ui.js';
 
 const app = document.getElementById('app');
@@ -29,6 +29,8 @@ function parse(pathname) {
   if (path === '/privacy') return { view: 'privacy' };
   if (path === '/map') return { view: 'map' };
   if (path === '/search') return { view: 'search' };
+  const tg = path.match(/^\/tag\/(.+)$/);
+  if (tg) return { view: 'tag', name: decodeURIComponent(tg[1]) };
   const st = path.match(/^\/style\/(.+)$/);
   if (st) return { view: 'style', name: decodeURIComponent(st[1]) };
   const shelf = path.match(/^\/@([^/]+)\/(wishlist|likes)$/);
@@ -296,6 +298,12 @@ function viewLog() {
             placeholder="Search a bar, or type any name" autocomplete="off">
           <div class="ac" id="acVenue"></div>
         </div>
+        <div class="field">
+          <label for="tags">Tags</label>
+          <input id="tags" name="tags" maxlength="200" autocomplete="off"
+            placeholder="with dad, session, too warm">
+          <p class="hint">Comma separated, up to 8. Anything you'd want to find later.</p>
+        </div>
         <label class="rank-toggle" style="margin-bottom:14px">
           <input type="checkbox" id="again"> I've had this before
         </label>
@@ -529,6 +537,7 @@ function viewLog() {
         note: form.note.value,
         serving: servingInput.value,
         again: app.querySelector('#again').checked,
+        tags: app.querySelector('#tags').value,
         venueName: form.venue.value,
         lat: pinned?.lat, lon: pinned?.lon,
         venueCity: form.venue.dataset.city || '',
@@ -551,7 +560,7 @@ async function viewProfile(handle) {
   loading();
   let data;
   try { data = await api.profile(handle); } catch (err) { return oops(err.message); }
-  const { user, stats, styles, pours, viewerFollows } = data;
+  const { user, stats, styles, pours, viewerFollows, favourites = [], tags = [] } = data;
   const mine = data.isSelf || state.me?.handle === user.handle;
 
   const avatar = user.avatar
@@ -580,6 +589,11 @@ async function viewProfile(handle) {
       </span>
     </section>
 
+    ${favourites.length || mine ? `<section class="block">
+      ${blockHead('Favourites', mine ? 'four beers, pinned' : '')}
+      ${favouriteSlots(favourites, mine)}
+    </section>` : ''}
+
     <div class="tiles">
       ${tile('logged', stats.pours ?? 0)}
       ${tile('beers', stats.beers ?? 0)}
@@ -593,6 +607,12 @@ async function viewProfile(handle) {
       <div class="wall">${pours.filter((p) => p.photo_key).slice(0, 24).map((p) =>
         `<a class="wtile" href="/b/${encodeURIComponent(p.brewery_slug)}/${encodeURIComponent(p.beer_slug)}"
           title="${esc(p.beer)} — ${esc(p.brewery)}">${photoImg(p.photo_key)}</a>`).join('')}</div>
+    </section>` : ''}
+
+    ${tags.length ? `<section class="block">
+      ${blockHead('Tags')}
+      <div class="chips">${tags.map((t) =>
+        `<a class="chip" href="/tag/${encodeURIComponent(t.tag)}">${esc(t.label)}<span class="n">${t.n}</span></a>`).join('')}</div>
     </section>` : ''}
 
     ${styles.length ? `<section class="block">
@@ -667,6 +687,11 @@ function openEditor(btn, p, handle) {
         `<button type="button" class="chip${p.serving === v ? ' chip-on' : ''}" data-serving="${v}">${v}</button>`).join('')}</div>
       <input type="hidden" id="eservval" value="${esc(p.serving || '')}">
     </div>
+    <div class="field">
+      <label for="etags">Tags</label>
+      <input id="etags" maxlength="200" autocomplete="off"
+        value="${esc((p.tags || []).map((t) => t.label).join(', '))}" placeholder="with dad, session">
+    </div>
     <label class="rank-toggle"><input type="checkbox" id="eagain"${p.again ? ' checked' : ''}> I've had this before</label>
     <div class="beer-acts" style="margin-top:14px">
       <button class="btn btn-amber" id="esave">Save changes</button>
@@ -698,6 +723,7 @@ function openEditor(btn, p, handle) {
         venue: row.querySelector('#evenue').value,
         serving: sv.value,
         again: row.querySelector('#eagain').checked,
+        tags: row.querySelector('#etags').value,
       });
       go(`/@${handle}`);
     } catch (err) { msg.className = 'msg err'; msg.textContent = err.message; }
@@ -748,10 +774,19 @@ async function viewBeer(brewerySlug, beerSlug) {
     <section class="block">
       ${blockHead('Reviews', pours.length ? plural(pours.length, 'entry', 'entries') : '')}
       ${pours.length
-        ? `<ul class="pours">${pours.map((p) => pourRow({
+        ? `<ul class="pours reviews">${pours.map((p) => `${pourRow({
             ...p, beer: beer.name, beer_slug: beer.slug,
             brewery: beer.brewery, brewery_slug: beer.brewerySlug,
-          }, { who: true })).join('')}</ul>`
+          }, { who: true })}
+          <li class="revfoot" data-pour="${p.id}">
+            <button class="revlike${p.liked ? ' on' : ''}" data-like="${p.id}" data-on="${p.liked ? '1' : '0'}"
+              ${state.me?.handle ? '' : 'disabled'}>
+              <span class="ic">${p.liked ? '♥' : '♡'}</span> <span class="ct">${p.likes || 0}</span>
+            </button>
+            <button class="revcom" data-comments="${p.id}">${
+              p.comments ? plural(p.comments, 'comment') : 'Comment'}</button>
+            <span class="thread" id="thread-${p.id}" hidden></span>
+          </li>`).join('')}</ul>`
         : '<div class="empty"><p>No reviews yet.</p></div>'}
     </section>
 
@@ -768,8 +803,10 @@ async function viewBeer(brewerySlug, beerSlug) {
           data-on="${data.viewer.wants ? '1' : '0'}">
           <span class="ic">${data.viewer.wants ? '✓' : '+'}</span> <span class="lbl">${
             data.viewer.wants ? 'On your list' : 'Want to try'}</span></button>
-        <button class="btn" id="addList">Add to a list</button>` : ''}
+        <button class="btn" id="addList">Add to a list</button>
+        <button class="btn" id="favBtn">Pin to favourites</button>` : ''}
     </div>
+    <p class="msg" id="actMsg"></p>
     <div id="listPicker"></div>
   </div>`;
 
@@ -789,11 +826,34 @@ async function viewBeer(brewerySlug, beerSlug) {
         b.classList.toggle('on', !on);
         b.querySelector('.ic').textContent = on ? off_[0] : on_[0];
         b.querySelector('.lbl').textContent = on ? off_[1] : on_[1];
-      } catch (err) { alert(err.message); } finally { b.disabled = false; }
+      } catch (err) { say(err.message, true); } finally { b.disabled = false; }
     });
   };
   bindMark('#likeBtn', 'like', ['♥', 'Liked'], ['♡', 'Like']);
   bindMark('#wantBtn', 'want', ['✓', 'On your list'], ['+', 'Want to try']);
+
+  app.querySelector('#favBtn')?.addEventListener('click', async (e) => {
+    const b = e.currentTarget;
+    b.disabled = true;
+    try {
+      const res = await api.fav(beer.brewerySlug, beer.slug, true);
+      b.textContent = `Pinned (${res.favourites.length}/4)`;
+      b.classList.add('on');
+      say(`Pinned to your favourites (${res.favourites.length} of 4).`);
+    } catch (err) { say(err.message, true); } finally { b.disabled = false; }
+  });
+
+  bindReviewSocial(app, data.pours);
+}
+
+// Beer-page feedback in the page, not a browser dialog. The favourites cap
+// returns a 409 with a real sentence in it, and an alert() either interrupts or
+// — in some contexts — is swallowed entirely, so the click looks like a no-op.
+function say(text, isError = false) {
+  const el = document.getElementById('actMsg');
+  if (!el) return;
+  el.className = `msg ${isError ? 'err' : 'ok'}`;
+  el.textContent = text;
 }
 
 // Pick an existing list or make one on the spot — a beer you want to remember
@@ -1606,6 +1666,92 @@ async function viewShelf(handle, kind) {
   </div>`;
 }
 
+// Likes and comments on what people *wrote*. Liking a review is a different act
+// from liking the beer — you can love the write-up of something you hated.
+function bindReviewSocial(root, pours) {
+  root.querySelector('.reviews')?.addEventListener('click', async (e) => {
+    const like = e.target.closest('button[data-like]');
+    if (like) {
+      const on = like.dataset.on === '1';
+      like.disabled = true;
+      try {
+        const res = await api.likeReview(like.dataset.like, !on);
+        like.dataset.on = on ? '0' : '1';
+        like.classList.toggle('on', !on);
+        like.querySelector('.ic').textContent = on ? '♡' : '♥';
+        like.querySelector('.ct').textContent = res.likes;
+      } catch (err) { alert(err.message); } finally { like.disabled = false; }
+      return;
+    }
+
+    const open = e.target.closest('button[data-comments]');
+    if (!open) return;
+    const id = open.dataset.comments;
+    const box = root.querySelector(`#thread-${id}`);
+    if (!box.hidden) { box.hidden = true; return; }
+    box.hidden = false;
+    box.innerHTML = '<span class="loading">loading…</span>';
+    let d;
+    try { d = await api.comments(id); } catch { box.innerHTML = '<span class="hint">Could not load comments.</span>'; return; }
+    drawThread(box, id, d.comments);
+  });
+}
+
+function drawThread(box, pourId, comments) {
+  box.innerHTML = `
+    ${comments.length ? `<ul class="comments">${comments.map((c) => `
+      <li data-comment="${c.id}">
+        <a href="/@${esc(c.handle)}">${esc(c.name || c.handle)}</a>
+        <span class="cbody">${esc(c.body)}</span>
+        ${state.me?.handle === c.handle ? '<button class="kill" data-del-comment="' + c.id + '">delete</button>' : ''}
+      </li>`).join('')}</ul>` : '<p class="hint">No comments yet.</p>'}
+    ${state.me?.handle ? `<form class="cform">
+      <input name="body" maxlength="1000" placeholder="Add a comment" autocomplete="off">
+      <button class="btn" type="submit">Post</button>
+    </form>` : ''}`;
+
+  box.querySelector('.cform')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = e.target.body;
+    const text = input.value.trim();
+    if (!text) return;
+    input.disabled = true;
+    try {
+      const added = await api.addComment(pourId, text);
+      drawThread(box, pourId, [...comments, added]);
+      const btn = box.closest('.revfoot')?.querySelector('button[data-comments]');
+      if (btn) btn.textContent = plural(comments.length + 1, 'comment');
+    } catch (err) { alert(err.message); input.disabled = false; }
+  });
+
+  box.querySelector('.comments')?.addEventListener('click', async (e) => {
+    const del = e.target.closest('button[data-del-comment]');
+    if (!del) return;
+    del.disabled = true;
+    try {
+      await api.deleteComment(del.dataset.delComment);
+      drawThread(box, pourId, comments.filter((c) => String(c.id) !== del.dataset.delComment));
+    } catch { del.disabled = false; }
+  });
+}
+
+async function viewTag(name) {
+  loading();
+  let d;
+  try { d = await api.tag(name); } catch (err) { return oops(err.message); }
+  app.innerHTML = `<div class="wrap">
+    <section class="hero"><p class="kicker">Tag</p>
+      <h2>${esc(d.label)}</h2>
+      <p>${d.pours.length ? `${plural(d.pours.length, 'entry', 'entries')} tagged “${esc(d.label)}”.`
+        : 'Nothing tagged this yet.'}</p></section>
+    <section class="block">
+      ${d.pours.length
+        ? `<ul class="pours">${d.pours.map((p) => pourRow(p, { who: true })).join('')}</ul>`
+        : '<div class="empty"><p>Add tags when you log or edit an entry.</p></div>'}
+    </section>
+  </div>`;
+}
+
 // ---- boot ------------------------------------------------------------------
 
 function render() {
@@ -1629,6 +1775,7 @@ function render() {
     case 'map': return viewMap();
     case 'search': return viewSearch();
     case 'style': return viewStyle(r.name);
+    case 'tag': return viewTag(r.name);
     case 'shelf': return viewShelf(r.handle, r.kind);
     case 'brewery': return viewBrewery(r.slug);
     default: return oops('There is nothing at that address.');

@@ -258,6 +258,30 @@ The 117-style canon was decoration for weeks — every style name was dead text.
 and typical ABV from the canon, plus every beer logged under it and how it rates.
 Style names are now links wherever they appear, exactly like brewery names.
 
+## The social layer on writing
+
+`review_likes` and `comments` hang off a **pour**, not a beer, because they are
+about what someone *wrote*. You can love the write-up of a beer you hated, and
+that distinction is most of what makes Letterboxd reviews worth reading.
+
+Comments can only be deleted by their author — there is no moderator role, and
+the UI says so rather than implying one exists.
+
+## Tags
+
+`pour_tags` stores `tag` lowercased for matching and `label` as first spelled,
+so `#Session` and `#session` are one tag that still displays the way someone
+typed it. Capped at 8 per entry, 30 characters each. Tags carry the context the
+schema never anticipated — "with dad", "too warm", "birthday", "session" — and
+`/tag/:tag` collects them across everyone.
+
+## A routing bug worth remembering
+
+`POST /api/pours` was matched on `route[0] === 'pours'` alone, so it swallowed
+`/pours/:id/like` and `/pours/:id/comments` and tried to log a beer out of their
+bodies — the error was a confusing "Which brewery?". Collection handlers need
+`!route[1]`; sub-resources need their own guard.
+
 ## Explicit non-goals
 
 No badges, streaks or check-in mechanics. No ads. No email storage. No
