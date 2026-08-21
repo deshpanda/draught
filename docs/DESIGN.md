@@ -165,135 +165,31 @@ of a later keystroke.
 
 ## The look
 
-**Two Inks on Ivory** — a drinks journal rather than a dashboard. Ivory stock
-`#F5F0E6`, ink `#191510`, one second plate in tobacco amber `#8A5314`, and a dark
-variant that inverts the same relationships. Measured, not eyeballed: body text
-7.42:1, headings 15.99:1, ivory on the amber button 5.56:1.
+Plain and legible, in three rules, in order of importance.
 
-Everything is **EB Garamond** — roman, italic and spaced caps from one family,
-which is what makes a page look *set* rather than assembled. There is no sans and
-no mono outside `<code>`. Small caps are faux (uppercase plus tracking) so they
-render identically if the font files never arrive; with `font-display: swap` the
-fallback is a real old-style serif on every OS.
+**1. Readability first.** The system font stack and nothing else — no webfont at
+all, so there is nothing to download, nothing to swap and nothing to misrender.
+Sentence case, ordinary sizes, no letterspaced small caps. An earlier pass set
+the whole interface in EB Garamond; it was handsome and it read badly, which is
+the wrong trade for a thing you scan every day.
 
-Three decisions worth keeping:
+**2. Amber means state.** Amber is never decoration. It marks exactly four
+things: a rating, the page you are on, the primary action, and a count. Beer
+titles, list titles and body links are ink and turn amber only on hover. This is
+the rule that makes the one accent legible — when every title was amber, the
+colour carried no information. Enforced by a check that walks every rendered
+text node: amber-as-text appears only on `.stars`, `.rank`, `.chip .n` and
+`.tally .count`.
 
-- **Rules, not boxes.** `border-radius: 0` everywhere except a person's face.
-  Five rounded rectangles read as a dashboard; a hairline-ruled strip of figures
-  reads as a magazine.
-- **The ledger is a wine list.** The beer and brewery stack, with the markup's
-  hard-coded `· ` pulled into the margin as real hanging punctuation.
-- **The masthead only goes sticky at ≥46rem.** Eight spaced-caps nav items need
-  three lines at 375px, and a sticky header would eat a quarter of the phone
-  viewport.
+**3. No devices.** No hanging punctuation, no rule-only tiles, no faux small
+caps. Each one cost a beat of comprehension for a visual idea nobody asked for.
+Links are not underlined in lists either — underlining every beer title turns a
+ledger into a wall of rules; weight and hover carry them, and prose keeps its
+underlines where a link has to be findable mid-sentence.
 
-This replaced an inherited amber-on-black theme carried over from Matinée. That
-was coherent but generic; the product's whole claim is that it is *taste-first*,
-and prose deserves to be set like prose.
-
-Fonts are self-hosted — see [`public/assets/fonts/README.md`](../public/assets/fonts/README.md).
-The privacy page promises no third-party requests, so a Google Fonts link would
-make it a lie.
-
-## LLD — rate limiting
-
-Fixed-window counters in D1, one row per `action:actor` bucket. The whole check
-is a single statement:
-
-```sql
-INSERT INTO rate_limits (bucket, window_start, count) VALUES (?1, ?2, 1)
-ON CONFLICT(bucket) DO UPDATE SET
-  window_start = CASE WHEN ?2 - rate_limits.window_start >= ?3 THEN ?2 ELSE rate_limits.window_start END,
-  count        = CASE WHEN ?2 - rate_limits.window_start >= ?3 THEN 1 ELSE rate_limits.count + 1 END
-RETURNING count, window_start
-```
-
-Read-then-write would race with itself and let bursts through; one UPSERT with
-`RETURNING` is atomic. The actor is the signed-in user id, falling back to
-`cf-connecting-ip` so anonymous endpoints are still bounded.
-
-| Action | Cap | Why |
-| --- | --- | --- |
-| `newBeer` | 25/h | The vandalism vector — this mints rows everyone sees |
-| `pour` | 40/h | Ordinary logging; deliberately looser than `newBeer` |
-| `upload` | 30/h | Costs storage |
-| `listItem` | 120/h | Cheap, curating is bursty |
-| `followAct` | 100/h | Stops follow-spam without hampering a browsing session |
-| `listCreate` | 15/h | |
-| `handleClaim` | 10/h | Also blunts handle enumeration |
-| `brewerySearch` | 300/h per IP | Politeness to Open Brewery DB's free API |
-
-Two deliberate choices: the limiter **fails open** (a broken limiter must not
-take logging down with it), and hitting the `newBeer` cap still lets you log
-against beers that already exist — the cap gates *creation*, not use.
-
-## LLD — deletion
-
-`DELETE /api/account` is the only destructive endpoint, and it is ordered for
-recoverability: collect the user's photo keys, run one **atomic batch** for every
-delete, then perform idempotent fixups.
-
-`beers.created_by` has no `ON DELETE` action, so a user who ever created a beer
-cannot be deleted while it references them — the batch nulls it first. (D1 *does*
-enforce foreign keys; assuming otherwise cost a debugging round.) The fixups hand
-any beer cover the departing user supplied to a surviving drinker's photo, then
-bin only genuinely unreferenced R2 objects. Canonical breweries and beers stay:
-other people's pours point at them, and deleting a beer because one drinker left
-would vandalise their shelves.
-
-## LLD — the map
-
-`worldmap.js` is Natural Earth 110m country outlines baked into equirectangular
-SVG paths (viewBox 1000x403, Antarctica clipped), served from our own origin.
-**No tile server and no map library** — a tile request would leak every viewer's
-IP to a third party, and the privacy page promises that doesn't happen.
-
-The projection was recovered from the path data rather than documented anywhere:
-longitude spans the full width, giving `1000/360 = 2.7778 px/deg`, and the
-vertical offset came from fitting the path bounding box (y 4..391) to Natural
-Earth's land extremes — 83.6°N at Greenland, -55.9°S at Cape Horn — which puts
-viewBox y=0 at **85.04°N**. Validated by projecting twelve known cities and
-asserting each falls inside its own country's path via `isPointInFill`. Eleven
-hit; Sydney lands 1px offshore, which is the 110m coastline's own coarseness
-(1px = 0.36° ≈ 40km), not a projection error.
-
-### Finding a place
-
-`GET /api/places` proxies **Photon** (photon.komoot.io), an OSM-based geocoder
-built for typeahead. Two alternatives were rejected: Nominatim, OSM's main
-geocoder, *explicitly forbids* autocomplete in its usage policy; and Google
-Places needs a billing account with a card on file and would put a third-party
-script on every page, which the privacy page promises there isn't.
-
-Proxying matters — Photon only ever sees this Worker, never a viewer's IP or
-identity. Responses are cached for 24h on the normalised upstream URL, so the
-same search costs Photon one request a day rather than one per keystroke (157ms
-cold, 3ms warm), and the endpoint is rate limited because it is someone else's
-free service. Results rank `amenity=pub|bar|brewery|…` above everything else,
-because this is a beer app and not a gazetteer.
-
-A picked suggestion stores its geography on the input's dataset; editing the name
-by hand clears it, or a typed-in venue would silently inherit the last
-suggestion's city and coordinates.
-
-### The privacy line on location
-
-Publishing "who drank where" is the feature. Publishing someone's home address
-is not — and "where I drink most" is very often home. Four guards:
-
-| Guard | Effect |
-| --- | --- |
-| Rounding | Coordinates are cut to 4 dp (~11m) *before* storage. Enough for a bar, not a flat. |
-| Name check | Venues named `home`, `my flat`, `office`… are stored with **no coordinates at all**, whatever the device reported. Whole-name match, so "The Homestead" is unaffected. |
-| `geo_private` | Any pour can be excluded from every public map query while still showing on its own shelf. |
-| Explicit capture | The device is only asked on an explicit "Pin this spot" tap. No background tracking. |
-
-Venues are canonical and shared, keyed by the same `slugify` as breweries, so
-two people at the same bar produce one dot rather than one per spelling.
-
-`venues.created_by` deliberately carries **no foreign key**: `beers.created_by`
-has one with no `ON DELETE` action, which blocked account deletion outright until
-it was nulled first. Once was enough.
+Light by default, dark when the OS asks; both are the same design, one token
+block apart. 428 lines of CSS, which is roughly a quarter of what the discarded
+editorial treatment needed.
 
 ## Explicit non-goals
 

@@ -1,84 +1,57 @@
-/* ============================================================================
-   Draught — EDITORIAL / PRINT
-   ----------------------------------------------------------------------------
-   The brief: a drinks journal, not a feed. Warm ivory stock, two inks (a warm
-   black and a tobacco amber), hairline rules instead of boxes, spaced caps
-   instead of chrome, and one serif doing every job — roman, italic, caps —
-   the way a wine list or a Penguin colophon is set.
-
-   Rules of the house, so nothing drifts:
-     · One typeface. EB Garamond (OFL 1.1), self-hosted. No mono except <code>.
-     · Two inks. Warm black for everything; tobacco amber is the *second plate*
-       and appears only where it carries meaning (ratings, eyebrows, the one
-       primary action). A third, oxblood, exists solely for destruction.
-     · Rules, not boxes. Square corners everywhere. The only round thing on the
-       site is a person's face.
-     · Nothing loads from anywhere else. No CDN, no remote font, no pixel.
-
-   Set on ivory by default; the same setting, on dark stock, at the bottom.
-   ========================================================================= */
-
-/* ---------------------------------------------------------------- the type --
-   EB Garamond — SIL Open Font License 1.1.
-     Upstream: https://github.com/octaviopardo/EBGaramond12
-     Or google/fonts: ofl/ebgaramond/EBGaramond[wght].ttf
-                      ofl/ebgaramond/EBGaramond-Italic[wght].ttf
-   Convert each to woff2 (`woff2_compress`, or fonttools' `ttf2woff2`) and drop
-   them at the two paths below. No unicode-range: EB Garamond has no ★, and we
-   *want* the browser to fall back per-glyph for the star and the ½.
-   Until the files land, the fallback stack below is a real old-style serif on
-   every platform, so the page is never wrong — only less itself.             */
-
-@font-face {
-  font-family: "EB Garamond";
-  src: url("/assets/fonts/ebgaramond/EBGaramond-Variable.woff2") format("woff2");
-  font-weight: 400 800;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "EB Garamond";
-  src: url("/assets/fonts/ebgaramond/EBGaramond-Italic-Variable.woff2") format("woff2");
-  font-weight: 400 800;
-  font-style: italic;
-  font-display: swap;
-}
-
-/* ------------------------------------------------------------- the palette --
-   Contrast, measured (WCAG 2.1, sRGB) against ivory #F5F0E6 / panel #EFE8DA:
-     ink      #191510   15.99 : 1  /  14.90 : 1
-     graphite #554C3F    7.42 : 1  /   6.91 : 1
-     faint    #6B6152    5.35 : 1  /   4.98 : 1   (4.55 : 1 in a field well)
-     spot     #8A5314    5.56 : 1  /   5.18 : 1
-     oxblood  #96231E    7.23 : 1  /   6.74 : 1
-     ivory on spot                     5.56 : 1   (primary button)
-     edge     #8C7D60    3.54 : 1  /   3.30 : 1   (field rules, unlit stars)  */
+/* Draught — plain and legible.
+ *
+ * Rules this follows, in order of importance:
+ *
+ *  1. READABILITY FIRST. System sans, sentence case, ordinary sizes. No webfont
+ *     at all — nothing to load, nothing to swap, nothing to misrender. The
+ *     previous serif looked handsome and read badly; that trade is not worth it
+ *     for a thing you scan every day.
+ *  2. AMBER MEANS STATE. Amber is never decoration. It marks exactly four
+ *     things: a rating, the page you are on, the primary action, and a count.
+ *     Beer titles, list titles and body links are ink — amber only on hover.
+ *     When everything was amber, nothing was.
+ *  3. NO DEVICES. No letterspaced small caps, no hanging punctuation, no
+ *     rule-only tiles. Every one of those cost a beat of comprehension.
+ *
+ * Light by default, dark when the reader's OS asks. Both are the same design.
+ */
 
 :root {
-  color-scheme: light;
-
-  --paper:    #f5f0e6;   /* the stock                        */
-  --paper-2:  #efe8da;   /* a toned panel, a boxed sidebar   */
-  --paper-3:  #e7decc;   /* an empty plate, a photo well     */
-  --ink:      #191510;   /* body copy, headlines             */
-  --graphite: #554c3f;   /* second-rank copy, decks          */
-  --faint:    #6b6152;   /* captions, folios, meta           */
-  --edge:     #8c7d60;   /* form rules, the unlit star       */
-  --rule:     #cfc5b0;   /* the hairline                     */
-  --rule-2:   #b9ad94;   /* a heavier hairline               */
-  --spot:     #8a5314;   /* the second plate — tobacco amber */
-  --spot-2:   #7e4b11;   /* pressed                          */
-  --oxblood:  #96231e;   /* errors, deletion                 */
-
-  --serif: "EB Garamond", "Iowan Old Style", "Palatino Linotype", Palatino,
-           "Book Antiqua", Georgia, "Times New Roman", Times, serif;
+  --bg: #fbf9f5;
+  --surface: #ffffff;
+  --surface-2: #f3f0e9;
+  --line: #e3ded3;
+  --line-2: #cec7b8;
+  --text: #1b1917;
+  --muted: #66615a;
+  --faint: #8d8781;
+  --amber: #9a6410;         /* amber as TEXT — 5.6:1 on --bg */
+  --amber-fill: #e5a33e;    /* amber as a FILL — ink sits on it */
+  --amber-soft: #f6ead3;
+  --on-amber: #1b1400;
+  --red: #ad2015;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --maxw: 940px;
+  --r: 8px;
+}
 
-  --maxw: 66rem;
-  --gutter: 1.375rem;
-  --measure: 34em;
-  --grain: 0.05;
-  --caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7' viewBox='0 0 11 7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' fill='none' stroke='%23554c3f' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15130f;
+    --surface: #1d1a15;
+    --surface-2: #26221b;
+    --line: #322c23;
+    --line-2: #4a4235;
+    --text: #f1ede4;
+    --muted: #a9a295;
+    --faint: #857e71;
+    --amber: #e8a94f;       /* 8.9:1 on --bg */
+    --amber-fill: #e5a33e;
+    --amber-soft: #2a2317;
+    --on-amber: #1b1400;
+    --red: #ec8378;
+  }
 }
 
 * { box-sizing: border-box; }
@@ -86,980 +59,369 @@ html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
-  background: var(--paper);
-  color: var(--ink);
-  font-family: var(--serif);
-  font-size: 1.0625rem;              /* 17px — Garamond runs small */
-  line-height: 1.62;
-  font-kerning: normal;
-  font-variant-ligatures: common-ligatures contextual;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  overflow-wrap: break-word;
-  min-height: 100svh;
-}
-@media (min-width: 46rem) { body { font-size: 1.125rem; line-height: 1.6; } }
-
-/* The tooth of the paper. An inline SVG — nothing is fetched. */
-body::after {
-  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 6;
-  opacity: var(--grain);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-::selection { background: var(--spot); color: var(--paper); }
+.wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 20px; }
 
-:focus-visible {
-  outline: 2px solid var(--spot);
-  outline-offset: 2px;
-}
+/* Links are ink. In lists, weight and hover carry them — underlining every
+ * beer title turns a ledger into a wall of rules. Prose keeps its underlines,
+ * where a link genuinely needs to be findable mid-sentence. */
+a { color: var(--text); text-decoration: none; }
+a:hover { color: var(--amber); }
+.prose a, .fine a, .hint a { text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 2px; }
+.prose a:hover, .fine a:hover, .hint a:hover { text-decoration-color: currentColor; }
 
-a { color: var(--spot); text-decoration: none; }
-a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.18em; }
+h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
 
-img { max-width: 100%; }
-hr { border: 0; border-top: 1px solid var(--rule); margin: 2rem 0; }
-
-.wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--gutter); }
-
-/* ------------------------------------------------------------- spaced caps --
-   The furniture of the page: eyebrows, sideheads, labels, folios, captions.
-   Faux small caps (uppercase + tracking) rather than the smcp feature, because
-   it renders identically whatever font actually arrives.                      */
-
-.site-nav a, .site-nav button, .kicker, .block-head h3, .block-head .note,
-.panel h4, .tile .k, .pours .d, .pours .t .meta, .litems .meta, .btn, .kill,
-.field label, .out, .clear, .head-note, .foot, .loading, .social, .gate .tag,
-.threeup h4, .hist-axis, .geo-state, .rank-toggle, .lcard .rank, .lcard .ln,
-.tally .n, .tally .count, .tbl th, .ac .m, .chip .n {
-  font-family: var(--serif);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  font-variant-numeric: lining-nums tabular-nums;
-  line-height: 1.35;
-}
-
-/* Two things stay out of caps on purpose. A handle is an address someone chose,
-   so it is never re-cased; and captions or status lines can run long, and long
-   copy in spaced caps is unreadable — those get italic, the print convention
-   for a parenthetical aside. */
-.at, .fcard .fh {
-  font-family: var(--serif); letter-spacing: 0.1em; font-weight: 400;
-}
-.msg, .mapnote, .tally .extra {
-  font-family: var(--serif); font-style: italic; letter-spacing: 0.01em;
-}
-
-/* ================================================================ nameplate */
-
-/* A nameplate, not an app bar. Eight nav items in spaced caps need three lines
-   on a phone, and 230px of sticky chrome is a quarter of the viewport — so on
-   small screens the nameplate simply sits at the top of the page and scrolls
-   away, the way it does on paper. It becomes sticky once there is room for it
-   on one line. */
+/* ---------- masthead ---------- */
 .masthead {
-  background: var(--paper);
-  border-bottom: 3px double var(--ink);   /* a printer's double rule */
-  padding: 1rem 0 0.8rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  padding: 14px 0;
+  margin-bottom: 8px;
 }
-@media (min-width: 46rem) {
-  .masthead { position: sticky; top: 0; z-index: 5; padding: 1.05rem 0 0.85rem; }
-}
-.masthead .wrap {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: 0.45rem 1.25rem; flex-wrap: wrap;
-}
-
-.brand {
-  font-family: var(--serif);
-  font-size: 1.25rem; font-weight: 600;
-  letter-spacing: 0.24em; text-transform: uppercase;
-  color: var(--ink); text-decoration: none; line-height: 1;
-}
-@media (min-width: 46rem) { .brand { font-size: 1.4rem; } }
-.brand:hover { text-decoration: none; color: var(--ink); }
-.brand span { color: var(--spot); }
-
-.site-nav { display: flex; gap: 0.3rem 0.85rem; flex-wrap: wrap; align-items: baseline; }
-@media (min-width: 46rem) { .site-nav { gap: 0.35rem 1.15rem; } }
+.masthead .wrap { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.brand { font-size: 1.15rem; font-weight: 750; letter-spacing: -0.02em; text-decoration: none; color: var(--text); }
+.brand:hover { color: var(--text); }
+.brand span { color: var(--amber); }
+.site-nav { display: flex; align-items: center; gap: 4px 16px; flex-wrap: wrap; }
 .site-nav a, .site-nav button {
-  font-size: 0.6rem; letter-spacing: 0.13em;
-  color: var(--graphite); text-decoration: none;
-  border: 0; background: none; cursor: pointer;
-  padding: 0.15rem 0; border-bottom: 1px solid transparent;
+  font: inherit; font-size: 0.9rem; color: var(--muted); text-decoration: none;
+  background: none; border: 0; padding: 2px 0; cursor: pointer;
 }
-@media (min-width: 46rem) {
-  .site-nav a, .site-nav button { font-size: 0.68rem; letter-spacing: 0.16em; }
-}
-.site-nav a:hover, .site-nav button:hover {
-  color: var(--ink); text-decoration: none; border-bottom-color: var(--rule-2);
-}
-.site-nav a.on { color: var(--spot); border-bottom-color: var(--spot); }
+.site-nav a:hover, .site-nav button:hover { color: var(--text); }
+.site-nav a.on { color: var(--amber); font-weight: 600; }     /* state */
 .site-nav .cta {
-  color: var(--paper); background: var(--spot);
-  padding: 0.4rem 0.8rem; border-bottom: 0; font-size: 0.6rem;
+  background: var(--amber-fill); color: var(--on-amber); font-weight: 650;
+  border-radius: var(--r); padding: 7px 13px;
 }
-@media (min-width: 46rem) { .site-nav .cta { padding: 0.45rem 0.9rem; font-size: 0.66rem; } }
-.site-nav .cta:hover { background: var(--spot-2); color: var(--paper); border-bottom-color: transparent; }
+.site-nav .cta:hover { background: var(--amber-fill); color: var(--on-amber); filter: brightness(1.06); }
+.avatar { width: 24px; height: 24px; border-radius: 50%; vertical-align: -7px; margin-right: 6px; }
 
-.avatar {
-  width: 1.35rem; height: 1.35rem; border-radius: 50%;
-  vertical-align: -0.4em; margin-right: 0.45rem;
-  background: var(--paper-3); border: 1px solid var(--rule);
-}
+/* ---------- headings & sections ---------- */
+.hero { padding: 26px 0 6px; }
+.hero h1, .hero h2 { font-size: clamp(1.6rem, 4.5vw, 2.15rem); line-height: 1.15; margin-bottom: 6px; }
+.hero em { font-style: normal; }              /* no amber on headings */
+.hero p { color: var(--muted); margin: 0; max-width: 62ch; }
+.kicker { font-size: 0.82rem; color: var(--faint); margin: 0 0 6px; }
 
-/* ================================================= headlines and sideheads */
+section.block { margin: 30px 0; }
+.block-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.block-head h3 { font-size: 1rem; font-weight: 650; white-space: nowrap; }
+.block-head .rule { flex: 1; height: 1px; background: var(--line); }
+.block-head .note { font-size: 0.82rem; color: var(--faint); white-space: nowrap; }
 
-.hero { padding: 3.25rem 0 0.5rem; }
-@media (min-width: 46rem) { .hero { padding: 4.5rem 0 0.5rem; } }
+.grid2 { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 800px) { .grid2 { grid-template-columns: 1fr 1fr; } }
+.row { display: grid; gap: 14px; grid-template-columns: 1fr; }
+@media (min-width: 620px) { .row.two { grid-template-columns: 1fr 1fr; } .row.three { grid-template-columns: 1fr 1fr 1fr; } }
 
-.kicker {
-  font-size: 0.7rem; color: var(--spot); margin: 0 0 1.1rem;
-}
-.kicker::before {
-  content: ""; display: inline-block; width: 2rem; height: 1px;
-  background: currentColor; vertical-align: 0.32em; margin-right: 0.8rem;
-}
-.kicker a { color: inherit; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; }
+.panel h4 { font-size: 0.9rem; color: var(--muted); margin-bottom: 10px; }
+.head-note { font-size: 0.85rem; color: var(--muted); }
+.loading { color: var(--faint); padding: 40px 0; text-align: center; }
+.empty { text-align: center; padding: 40px 16px; color: var(--muted); }
+.empty p { margin: 0 0 14px; }
 
-.hero h1, .hero h2 {
-  font-size: clamp(2.35rem, 8.5vw, 4rem);
-  font-weight: 500; line-height: 1.02;
-  letter-spacing: -0.014em; margin: 0 0 0.7rem;
-  max-width: 26em;
-}
-.hero em { font-style: italic; font-weight: 400; color: var(--spot); }
-.hero p {
-  color: var(--graphite); max-width: var(--measure); margin: 0;
-  font-size: 1.115em; line-height: 1.5;
-}
-.hero code {
-  font-family: var(--mono); font-size: 0.8em; letter-spacing: 0;
-  background: var(--paper-3); padding: 0.1em 0.35em; color: var(--ink);
-}
+/* ---------- stat tiles: plain cards, ink numbers ---------- */
+.tiles { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); margin: 20px 0 4px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 13px 14px; }
+.tile .k { font-size: 0.8rem; color: var(--muted); margin: 0 0 4px; }
+.tile .v { font-size: 1.65rem; font-weight: 700; line-height: 1.1; margin: 0; font-variant-numeric: tabular-nums; }
+.tile .s { font-size: 0.8rem; color: var(--faint); margin: 3px 0 0; }
 
-section.block { margin: 3.25rem 0; }
-.block-head {
-  display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.15rem;
-}
-.block-head h3 {
-  font-size: 0.72rem; color: var(--ink); margin: 0; white-space: nowrap;
-}
-.block-head .rule {
-  flex: 1 1 1rem; align-self: center; height: 1px;
-  background: var(--rule-2); border: 0;
-}
-.block-head .note { font-size: 0.62rem; color: var(--faint); white-space: nowrap; }
-
-.head-note { font-size: 0.66rem; color: var(--faint); }
-
-.grid2 { display: grid; gap: 1.5rem; grid-template-columns: 1fr; }
-@media (min-width: 50rem) { .grid2 { grid-template-columns: 1fr 1fr; } }
-
-/* --------------------------------------------------------- a boxed sidebar */
-
-.panel {
-  background: var(--paper-2);
-  border: 1px solid var(--rule);
-  border-radius: 0;
-  padding: 1.5rem 1.35rem;
-}
-@media (min-width: 40rem) { .panel { padding: 1.85rem 1.75rem; } }
-.panel h4 {
-  font-size: 0.66rem; color: var(--faint); margin: 0 0 1.1rem;
-}
-.panel > p { margin: 0 0 0.8rem; max-width: var(--measure); }
-.panel > p:last-child { margin-bottom: 0; }
-
-/* ==================================================== the statistics strip
-   Not five little cards — one printed table of figures, each column under its
-   own rule with air between. Robust at any tile count, which auto-fit demands. */
-
-.tiles {
-  display: grid; gap: 0 1.75rem;
-  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
-  margin: 2.75rem 0 0;
-}
-.tile {
-  border-top: 1px solid var(--ink);
-  padding: 0.7rem 0 1.5rem;
-  min-width: 0;
-}
-.tile .k { font-size: 0.62rem; color: var(--faint); margin: 0 0 0.5rem; }
-.tile .v {
-  font-size: clamp(1.9rem, 6vw, 2.5rem); font-weight: 500; line-height: 0.95;
-  font-variant-numeric: lining-nums tabular-nums; margin: 0;
-  letter-spacing: -0.01em;
-}
-.tile .s {
-  font-size: 0.85rem; font-style: italic; color: var(--faint);
-  margin: 0.5rem 0 0; line-height: 1.35;
-}
-
-/* ===================================================== the ledger of pours
-   A wine list. On a phone: date and rating on the top line, the beer beneath,
-   the note as a hanging remark. From 40rem it opens out into three columns —
-   date · beer · rating — which is how a list is actually printed.            */
-
+/* ---------- the ledger ---------- */
 .pours { list-style: none; margin: 0; padding: 0; }
 .pours li {
-  display: grid;
+  display: grid; gap: 2px 12px; padding: 12px 0; border-bottom: 1px solid var(--line);
   grid-template-columns: 1fr auto;
-  column-gap: 1.1rem; row-gap: 0.15rem;
-  padding: 1rem 0;
-  border-bottom: 1px solid var(--rule);
+  grid-template-areas: "title stars" "meta stars" "note note";
 }
-.pours li:first-child { border-top: 1px solid var(--rule-2); }
-.pours li:last-child { border-bottom: 1px solid var(--rule-2); }
+.pours li:last-child { border-bottom: 0; }
+.pours li.haspic { grid-template-columns: 46px 1fr auto; grid-template-areas: "pic title stars" "pic meta stars" "note note note"; }
+.pours .thumb {
+  grid-area: pic; display: block; width: 46px; height: 46px; border-radius: 6px;
+  overflow: hidden; border: 1px solid var(--line); background: var(--surface-2);
+}
+.pours .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pours .t { grid-area: title; min-width: 0; }
+.pours .beer { font-weight: 600; }
+.pours .by { color: var(--muted); }
+.pours .d { grid-area: meta; font-size: 0.83rem; color: var(--faint); }
+.pours .meta { font-size: 0.83rem; color: var(--faint); }
+.pours .r { grid-area: stars; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.pours .stars { color: var(--amber); white-space: nowrap; font-size: 0.95rem; }   /* rating = state */
+.pours .note { grid-area: note; color: var(--muted); font-size: 0.93rem; margin: 5px 0 0; }
 
-.pours .d  { grid-column: 1; grid-row: 1; font-size: 0.62rem; color: var(--faint); white-space: nowrap; }
-.pours .r  { grid-column: 2; grid-row: 1; justify-self: end; }
-.pours .t  { grid-column: 1 / -1; grid-row: 2; min-width: 0; }
-.pours .note { grid-column: 1 / -1; grid-row: 3; }
-
-.pours li.haspic { grid-template-columns: 3.5rem 1fr auto; }
-.pours li.haspic .thumb { grid-column: 1; grid-row: 1 / 4; }
-.pours li.haspic .d { grid-column: 2; }
-.pours li.haspic .r { grid-column: 3; }
-.pours li.haspic .t,
-.pours li.haspic .note { grid-column: 2 / -1; }
-
-/* Name on its own line, producer beneath it in italic — a wine list, not a
-   sentence. The markup hard-codes a leading "· " on each byline, so the byline
-   block is pulled left by exactly that much: the middot hangs in the margin
-   (real hanging punctuation) and the producer aligns under the beer. */
-.pours .t .beer, .litems .it .beer {
-  display: block; font-size: 1.06em; color: var(--ink); text-decoration: none;
-  line-height: 1.25;
-}
-.pours .t .beer:hover { text-decoration: underline; text-underline-offset: 0.16em; }
-.pours .t .by, .litems .it .by {
-  display: block; margin-left: -0.42em; margin-top: 0.1rem;
-  color: var(--graphite); font-style: italic; font-size: 0.96em;
-}
-.pours .t .by a { color: var(--graphite); }
-.pours .t .by a:hover { color: var(--spot); }
-.pours .t .meta {
-  display: block; font-size: 0.6rem; color: var(--faint); margin-top: 0.3rem;
-}
-.pours .note {
-  font-size: 0.94em; color: var(--graphite); font-style: italic;
-  margin: 0.45rem 0 0; max-width: var(--measure);
-  padding-left: 0.9rem; border-left: 1px solid var(--rule-2);
-}
-.pours .r, .litems .r {
-  display: flex; align-items: baseline; gap: 0.9rem; justify-content: flex-end;
-}
-.pours .stars, .litems .stars {
-  color: var(--spot); font-size: 0.95rem; white-space: nowrap;
-}
-
-@media (min-width: 40rem) {
-  .pours li { grid-template-columns: 7.5rem 1fr auto; column-gap: 1.5rem; }
-  .pours .d { grid-row: 1; }
-  .pours .t { grid-column: 2; grid-row: 1; }
-  .pours .r { grid-column: 3; grid-row: 1; }
-  .pours .note { grid-column: 2 / -1; grid-row: 2; }
-
-  .pours li.haspic { grid-template-columns: 4rem 6.5rem 1fr auto; }
-  .pours li.haspic .thumb { grid-row: 1 / 3; }
-  .pours li.haspic .d { grid-column: 2; }
-  .pours li.haspic .t { grid-column: 3; grid-row: 1; }
-  .pours li.haspic .r { grid-column: 4; grid-row: 1; }
-  .pours li.haspic .note { grid-column: 3 / -1; grid-row: 2; }
-}
-
-/* A destructive action is a marginal note, not a button. */
-.kill {
-  font: inherit; font-family: var(--serif); font-weight: 600;
-  font-size: 0.58rem; letter-spacing: 0.16em; text-transform: uppercase;
-  color: var(--faint); background: none; border: 0; border-radius: 0;
-  border-bottom: 1px solid var(--rule-2);
-  cursor: pointer; padding: 0.25rem 0;
-}
-.kill:hover { color: var(--oxblood); border-bottom-color: var(--oxblood); }
-.kill:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* ======================================================= tags as index entries
-   A hairline box, square, with the tally set off behind a thin vertical rule —
-   the way a back-of-book index sets a term and its page count.               */
-
-.chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+/* ---------- chips ---------- */
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
 .chip {
-  font: inherit; font-size: 0.9rem; line-height: 1.2;
-  border: 1px solid var(--rule-2); border-radius: 0;
-  padding: 0.36rem 0.7rem; color: var(--ink); background: transparent;
-  text-decoration: none; display: inline-flex; align-items: baseline;
+  font-size: 0.88rem; border: 1px solid var(--line); border-radius: 999px;
+  padding: 4px 11px; background: var(--surface); color: var(--text); text-decoration: none;
 }
-a.chip:hover, button.chip:hover {
-  border-color: var(--ink); color: var(--ink); text-decoration: none;
-  background: var(--paper-2);
+a.chip:hover, button.chip:hover { border-color: var(--line-2); color: var(--text); }
+.chip .n { color: var(--amber); font-weight: 600; margin-left: 5px; }              /* count = state */
+button.chip { font: inherit; cursor: pointer; }
+.chip-on { background: var(--amber-fill); border-color: var(--amber-fill); color: var(--on-amber); font-weight: 650; }
+.tag, .rank {
+  font-size: 0.72rem; color: var(--amber); border: 1px solid var(--line-2);
+  border-radius: 4px; padding: 1px 5px; margin-left: 7px; text-transform: none;
 }
-button.chip { cursor: pointer; }
-.chip .n {
-  font-size: 0.6rem; color: var(--spot);
-  margin-left: 0.6rem; padding-left: 0.6rem;
-  border-left: 1px solid var(--rule-2);
-}
-.chip-on {
-  background: var(--ink); color: var(--paper); border-color: var(--ink);
-}
-.chip-on .n { color: var(--paper); border-left-color: rgba(245, 240, 230, 0.35); }
-a.chip-on:hover { background: var(--ink); color: var(--paper); }
+.abv { color: var(--muted); font-size: 0.85rem; }
 
-/* ============================================================ set in caps --
-   Buttons: a ruled box and spaced caps. One filled button per page, and it is
-   filled with the second ink.                                                */
-
+/* ---------- buttons ---------- */
 .btn {
-  font: inherit; font-family: var(--serif);
-  font-size: 0.68rem; font-weight: 600;
-  letter-spacing: 0.18em; text-transform: uppercase;
-  cursor: pointer; color: var(--ink); background: transparent;
-  border: 1px solid var(--ink); border-radius: 0;
-  padding: 0.75rem 1.35rem;
-  text-decoration: none; display: inline-block; text-align: center;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  font: inherit; font-size: 0.92rem; font-weight: 600; cursor: pointer;
+  color: var(--text); background: var(--surface);
+  border: 1px solid var(--line-2); border-radius: var(--r);
+  padding: 9px 15px; text-decoration: none; display: inline-block;
 }
-.btn:hover { background: var(--ink); color: var(--paper); text-decoration: none; }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn:disabled:hover { background: transparent; color: var(--ink); }
+.btn:hover { background: var(--surface-2); color: var(--text); }
+.btn-amber { background: var(--amber-fill); border-color: var(--amber-fill); color: var(--on-amber); }
+.btn-amber:hover { background: var(--amber-fill); color: var(--on-amber); filter: brightness(1.06); }
+.btn-lg { font-size: 1rem; padding: 12px 20px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-danger { color: var(--red); border-color: var(--red); background: none; }
+.btn-danger:hover { background: var(--red); color: var(--bg); }
+.kill {
+  font: inherit; font-size: 0.78rem; color: var(--faint); background: none;
+  border: 1px solid var(--line); border-radius: 5px; cursor: pointer; padding: 2px 7px;
+}
+.kill:hover { color: var(--red); border-color: var(--red); }
+.clear { font: inherit; font-size: 0.85rem; color: var(--faint); background: none; border: 0; cursor: pointer; }
+.clear:hover { color: var(--red); }
 
-.btn-amber {
-  background: var(--spot); color: var(--paper); border-color: var(--spot);
+/* ---------- forms ---------- */
+.field { margin-bottom: 15px; position: relative; }
+.field label { display: block; font-size: 0.88rem; font-weight: 600; color: var(--text); margin-bottom: 5px; }
+.field input, .field select, .field textarea {
+  width: 100%; font: inherit; font-size: 1rem; padding: 10px 12px;
+  color: var(--text); background: var(--surface);
+  border: 1px solid var(--line-2); border-radius: var(--r);
 }
-.btn-amber:hover { background: var(--spot-2); border-color: var(--spot-2); color: var(--paper); }
+.field textarea { min-height: 92px; resize: vertical; }
+.field input:focus, .field select:focus, .field textarea:focus {
+  outline: 2px solid var(--amber-fill); outline-offset: -1px; border-color: var(--amber-fill);
+}
+.field input[type="file"] { padding: 8px 10px; font-size: 0.9rem; }
+.field .hint { font-size: 0.84rem; color: var(--faint); margin: 5px 0 0; }
+.msg { font-size: 0.9rem; margin: 9px 0 0; min-height: 1.2em; }
+.msg.err { color: var(--red); }
+.msg.ok { color: var(--amber); }
+.rank-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.88rem; color: var(--muted); }
+.geo { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; }
+.geo-state { font-size: 0.84rem; color: var(--faint); }
+.geo-state.on { color: var(--amber); }
+.geo-off { margin-top: 9px; }
+.shot { margin-top: 9px; }
+.shot img { max-width: 180px; border-radius: var(--r); border: 1px solid var(--line); display: block; }
 
-.btn-lg { font-size: 0.76rem; padding: 0.95rem 1.9rem; }
-
-.btn-danger { border-color: var(--oxblood); color: var(--oxblood); background: transparent; }
-.btn-danger:hover { background: var(--oxblood); color: var(--paper); border-color: var(--oxblood); }
-
-/* ================================================================= the form
-   A printed form: a ruled line to write on, not a rounded well. The rule
-   thickens and takes the second ink when the line is live.                    */
-
-.field { margin-bottom: 1.4rem; position: relative; }
-.field label {
-  display: block; font-size: 0.62rem; color: var(--faint); margin-bottom: 0.35rem;
-}
-.field input, .field select, .field textarea, .picker-new input {
-  width: 100%; font: inherit; font-family: var(--serif); font-size: 1rem;
-  color: var(--ink); background: transparent;
-  border: 0; border-bottom: 1px solid var(--edge); border-radius: 0;
-  padding: 0.55rem 0.15rem; margin: 0;
-}
-.field select, .picker-new select {
-  appearance: none; -webkit-appearance: none;
-  background-color: var(--paper-2);
-  background-image: var(--caret);
-  background-repeat: no-repeat;
-  background-position: right 0.35rem center;
-  padding-right: 1.7rem;
-}
-.field option, .field optgroup { background: var(--paper-2); color: var(--ink); }
-.field optgroup { font-style: italic; font-weight: 600; }
-.field textarea {
-  min-height: 6.5rem; resize: vertical; line-height: 1.55;
-  border: 1px solid var(--edge); padding: 0.7rem 0.75rem;
-}
-.field input::placeholder, .field textarea::placeholder {
-  color: var(--faint); font-style: italic; opacity: 1;
-}
-.field input:focus, .field select:focus, .field textarea:focus,
-.picker-new input:focus {
-  outline: 2px solid var(--spot); outline-offset: 3px;
-  border-color: var(--spot);
-  border-bottom-width: 2px;
-}
-.field textarea:focus { border-width: 1px; }
-.field input:disabled {
-  color: var(--faint); border-bottom-style: dashed; -webkit-text-fill-color: var(--faint);
-}
-.field input[type="file"] {
-  border-bottom: 0; padding-left: 0; font-size: 0.9rem;
-}
-.field input[type="file"]::file-selector-button {
-  font: inherit; font-family: var(--serif); font-weight: 600;
-  font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase;
-  padding: 0.5rem 0.9rem; margin-right: 0.9rem;
-  border: 1px solid var(--ink); border-radius: 0;
-  background: transparent; color: var(--ink); cursor: pointer;
-}
-.field input[type="file"]::file-selector-button:hover { background: var(--ink); color: var(--paper); }
-.field input[type="checkbox"] { width: auto; accent-color: var(--spot); }
-
-.field .hint {
-  font-size: 0.85rem; font-style: italic; color: var(--faint);
-  margin: 0.45rem 0 0; max-width: var(--measure); line-height: 1.45;
-}
-.field .hint strong { font-style: normal; font-weight: 600; color: var(--graphite); }
-
-.row { display: grid; gap: 1.4rem; grid-template-columns: 1fr; }
-@media (min-width: 39rem) {
-  .row.two { grid-template-columns: 1fr 1fr; }
-  .row.three { grid-template-columns: 1fr 1fr 1fr; }
-}
-
-.msg {
-  font-size: 0.9rem; color: var(--graphite);
-  margin: 1rem 0 0; min-height: 1.2em;
-}
-.msg.err { color: var(--oxblood); }
-.msg.ok { color: var(--spot); }
-
-/* ------------------------------------------------------------ autocomplete */
-
-/* No `top` on purpose. With top/bottom auto an absolutely positioned box sits
-   at its static position — which, since .ac is the input's next sibling, is
-   flush under the input rather than below the field's hint text. */
+/* autocomplete */
 .ac {
-  position: absolute; z-index: 9; left: 0; right: 0; margin-top: 1px;
-  background: var(--paper);
-  border: 1px solid var(--ink); border-radius: 0;
-  box-shadow: 0 14px 34px rgba(25, 21, 16, 0.16);
-  max-height: 17rem; overflow-y: auto;
+  position: absolute; z-index: 9; left: 0; right: 0; top: 100%; margin-top: 4px;
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r);
+  overflow: hidden auto; max-height: 260px; box-shadow: 0 10px 26px rgba(0,0,0,0.13);
 }
 .ac:empty { display: none; }
 .ac button {
   display: block; width: 100%; text-align: left; font: inherit; cursor: pointer;
-  background: none; border: 0; border-bottom: 1px solid var(--rule);
-  border-radius: 0; padding: 0.6rem 0.8rem; color: var(--ink);
+  background: none; border: 0; border-bottom: 1px solid var(--line); padding: 9px 12px; color: var(--text);
 }
 .ac button:last-child { border-bottom: 0; }
-.ac button:hover, .ac button[aria-selected="true"] { background: var(--paper-2); }
-.ac .n { font-size: 0.98rem; }
-.ac .m {
-  display: block; font-size: 0.58rem; color: var(--faint); margin-top: 0.2rem;
-}
+.ac button:hover { background: var(--surface-2); }
+.ac .n { display: block; font-weight: 600; font-size: 0.94rem; }
+.ac .m { display: block; font-size: 0.82rem; color: var(--faint); }
 
-/* ============================================== the rating rail (0.5 – 5.0)
-   FRAGILE. Ten 0.5em windows over a 1em glyph; the explicit height is what
-   makes it visible at all. Colour and size only below this line.            */
-
-.rate {
-  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
-  min-height: 2.2rem; margin-top: 0.2rem;
-}
-.stars-input {
-  display: inline-flex; direction: ltr;
-  font-size: 1.9rem; line-height: 1; color: var(--edge);
-}
+/* ---------- the half-star rail (geometry is load-bearing) ---------- */
+.rate { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-height: 2rem; }
+.stars-input { display: inline-flex; font-size: 1.7rem; line-height: 1; color: var(--line-2); }
 .stars-input .half { position: relative; width: 0.5em; height: 1em; overflow: hidden; cursor: pointer; }
 .stars-input .half span { position: absolute; left: 0; top: 0; width: 1em; pointer-events: none; }
 .stars-input .half.rh span { left: -0.5em; }
-.stars-input .half.lit span { color: var(--spot); }
+.stars-input .half.lit span { color: var(--amber); }
+.rate .out { font-size: 0.9rem; color: var(--muted); min-width: 5.5em; }
 
-.rate .out {
-  font-size: 0.64rem; color: var(--graphite); min-width: 5.5em;
-}
-.rate .clear {
-  font: inherit; font-family: var(--serif); font-weight: 600;
-  font-size: 0.58rem; letter-spacing: 0.16em; text-transform: uppercase;
-  color: var(--faint); background: none; border: 0; border-radius: 0;
-  border-bottom: 1px solid var(--rule-2); cursor: pointer; padding: 0.2rem 0;
-}
-.rate .clear:hover { color: var(--oxblood); border-bottom-color: var(--oxblood); }
+/* ---------- profile head ---------- */
+.phead { display: flex; align-items: center; gap: 15px; padding: 24px 0 2px; flex-wrap: wrap; }
+.phead img { width: 60px; height: 60px; border-radius: 50%; border: 1px solid var(--line); }
+.phead h2 { font-size: clamp(1.4rem, 4vw, 1.9rem); }
+.phead .at { font-size: 0.92rem; color: var(--muted); }
+.phead .bio { color: var(--muted); font-size: 0.93rem; margin: 5px 0 0; max-width: 54ch; }
+.phead-act { margin-left: auto; }
+.social { font-size: 0.86rem; color: var(--muted); margin: 5px 0 0; }
+.social a { color: var(--muted); text-decoration: none; }
+.social a:hover { color: var(--amber); }
 
-/* ============================================================ the contributor
-   A byline block: the face, the name, the standfirst.                        */
+/* ---------- histogram ---------- */
+.hist { display: flex; align-items: flex-end; gap: 3px; height: 58px; }
+.hist .col { flex: 1; background: var(--amber-fill); border-radius: 2px 2px 0 0; min-height: 2px; }
+.hist .col.nil { background: var(--line); }
+.hist-axis { display: flex; justify-content: space-between; font-size: 0.76rem; color: var(--faint); margin-top: 5px; }
 
-.phead {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 1.1rem 1.4rem; padding: 3rem 0 0.25rem; flex-wrap: wrap;
-}
-.phead img {
-  width: 4rem; height: 4rem; border-radius: 50%;   /* the only circle */
-  background: var(--paper-3); border: 1px solid var(--rule-2); flex: none;
-}
-.phead > div { min-width: 0; flex: 1 1 14rem; }
-.phead h2 {
-  font-size: clamp(1.75rem, 6.5vw, 2.6rem); font-weight: 500;
-  letter-spacing: -0.012em; margin: 0; line-height: 1.05;
-}
-.phead .at { display: inline-block; font-size: 0.82rem; color: var(--spot); margin-top: 0.45rem; }
-.phead .bio {
-  color: var(--graphite); font-size: 0.98em; font-style: italic;
-  margin: 0.55rem 0 0; max-width: 46ch;
-}
-.phead-act { margin-left: auto; flex: none; }
-
-.social { font-size: 0.6rem; color: var(--faint); margin: 0.7rem 0 0; }
-.social a { color: var(--faint); text-decoration: none; }
-.social a:hover { color: var(--spot); text-decoration: none; }
-
-/* ============================================================= the histogram
-   Bars in the second ink, standing on a rule. No radius, no gradient.        */
-
-.hist {
-  display: flex; align-items: flex-end; gap: 3px; height: 5rem;
-  border-bottom: 1px solid var(--ink); padding-bottom: 1px;
-}
-.hist .col { flex: 1; background: var(--spot); min-height: 2px; border-radius: 0; }
-.hist .col:hover { background: var(--ink); }
-.hist .col.nil { background: var(--rule-2); }
-.hist-axis {
-  display: flex; justify-content: space-between;
-  font-size: 0.58rem; color: var(--faint); margin-top: 0.5rem;
-}
-
-/* ================================================================= the cover
-   The landing page is a title page: a device, the wordmark between two rules,
-   a subtitle in spaced caps, then the three-column standfirst.               */
-
-.gate {
-  min-height: calc(100svh - 12rem);
-  display: grid; place-items: center; padding: 2.5rem 0 3rem;
-}
-.gate-inner { text-align: center; max-width: 44rem; width: 100%; }
-
-/* The emoji becomes a fleuron. A drinks journal does not put a pint glass on
-   its title page; it puts a printer's ornament. */
-.gate .glass {
-  font-size: 0; line-height: 0; margin: 0 0 1.6rem; color: var(--spot);
-}
-.gate .glass::after {
-  content: "❖"; font-size: 0.85rem; line-height: 1; letter-spacing: 0.4em;
-}
-
-.gate h1 {
-  font-size: clamp(3rem, 14vw, 6.5rem); font-weight: 500;
-  letter-spacing: 0.005em; margin: 0; line-height: 1;
-  padding: 0.35em 0 0.3em;
-  border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink);
-}
-.gate .tag {
-  font-size: 0.66rem; color: var(--graphite); margin: 1.1rem 0 0;
-}
-.gate .pitch {
-  color: var(--graphite); font-size: 1.16em; font-style: italic;
-  line-height: 1.5; margin: 2rem auto 2.2rem; max-width: 32em;
-}
-.signin { display: flex; gap: 0.7rem; justify-content: center; flex-wrap: wrap; }
-.gate .fine {
-  font-size: 0.85rem; font-style: italic; color: var(--faint);
-  margin-top: 1.8rem; line-height: 1.6;
-}
-.gate .fine a { color: var(--spot); }
-
-.threeup {
-  display: grid; gap: 1.75rem; grid-template-columns: 1fr;
-  margin: 4rem 0 0; text-align: left;
-}
-.threeup > div { border-top: 1px solid var(--ink); padding-top: 0.85rem; }
-.threeup h4 { font-size: 0.62rem; color: var(--spot); margin: 0 0 0.6rem; }
-.threeup p { font-size: 0.95rem; color: var(--graphite); margin: 0; line-height: 1.5; }
-@media (min-width: 48rem) {
-  .threeup { grid-template-columns: repeat(3, 1fr); gap: 0 2rem; }
-  .threeup > div + div { border-left: 1px solid var(--rule); padding-left: 2rem; margin-left: -1rem; }
-}
-
-/* ============================================================ small matters */
-
-.empty {
-  text-align: center; padding: 3.5rem 1.25rem; color: var(--graphite);
-  border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
-}
-.empty::before {
-  content: "❖"; display: block; color: var(--spot);
-  font-size: 0.8rem; letter-spacing: 0.4em; margin-bottom: 1.1rem;
-}
-.empty p { margin: 0 0 1.1rem; font-style: italic; }
-.empty p:last-of-type { margin-bottom: 1.4rem; }
-.empty .hint { font-size: 0.9rem; color: var(--faint); }
-.empty .btn { margin: 0 0.25rem; }
-
-.loading {
-  font-size: 0.64rem; color: var(--faint);
-  padding: 4rem 0; text-align: center; margin: 0;
-}
-
-.foot {
-  border-top: 3px double var(--ink);
-  margin-top: 4.5rem; padding: 1.4rem var(--gutter) 3rem;
-  font-size: 0.58rem; color: var(--faint);
-  display: flex; justify-content: space-between; gap: 0.6rem 1.5rem; flex-wrap: wrap;
-}
-.foot a { color: var(--faint); text-decoration: none; }
-.foot a:hover { color: var(--spot); text-decoration: none; }
-
-.abv { font-size: 0.72rem; color: var(--spot); letter-spacing: 0.06em; }
-
-@media (prefers-reduced-motion: no-preference) {
-  .hero, .phead, .tiles, .gate-inner {
-    animation: rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-  .tiles { animation-delay: 0.08s; }
-  @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-}
-
-/* ================================================================== plates
-   Photographs are plates: a hairline frame, square corners, no rounding and
-   no filter on anyone's picture.                                            */
-
-.pours .thumb {
-  display: block; width: 3.5rem; height: 3.5rem; overflow: hidden;
-  border: 1px solid var(--rule-2); background: var(--paper-3); border-radius: 0;
-}
-.pours .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.pours .thumb:hover { border-color: var(--ink); }
-@media (min-width: 40rem) {
-  .pours .thumb { width: 4rem; height: 4rem; }
-}
-
-.hero-shot {
-  margin: 2.25rem 0 -1.25rem; overflow: hidden; border-radius: 0;
-  border: 1px solid var(--ink); max-height: 21rem;
-}
-.hero-shot img {
-  width: 100%; height: 100%; max-height: 21rem; object-fit: cover; display: block;
-}
-
-.shot { margin-top: 0.8rem; }
-.shot img {
-  max-width: 12rem; border: 1px solid var(--rule-2); border-radius: 0; display: block;
-}
-
-.wall {
-  display: grid; gap: 0.5rem;
-  grid-template-columns: repeat(auto-fill, minmax(min(6rem, 100%), 1fr));
-}
-.wtile {
-  display: block; aspect-ratio: 1; overflow: hidden; border-radius: 0;
-  border: 1px solid var(--rule-2); background: var(--paper-3);
-}
-.wtile:hover { border-color: var(--ink); }
+/* ---------- photos ---------- */
+.hero-shot { margin: 18px 0 -6px; border-radius: var(--r); overflow: hidden; border: 1px solid var(--line); max-height: 300px; }
+.hero-shot img { width: 100%; max-height: 300px; object-fit: cover; display: block; }
+.wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 7px; }
+.wtile { display: block; aspect-ratio: 1; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
 .wtile img { width: 100%; height: 100%; object-fit: cover; display: block; }
-@media (prefers-reduced-motion: no-preference) {
-  .wtile img { transition: transform 0.3s ease; }
-  .wtile:hover img { transform: scale(1.04); }
-}
 
-/* ============================================================= the directory
-   Followers are a ruled index of names, not a wall of cards.                 */
-
-.folk {
-  display: grid; gap: 0 1.75rem;
-  grid-template-columns: repeat(auto-fill, minmax(min(13rem, 100%), 1fr));
-}
+/* ---------- people ---------- */
+.folk { display: grid; gap: 9px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
 .fcard {
-  display: flex; align-items: center; gap: 0.8rem;
-  padding: 0.85rem 0; text-decoration: none; color: inherit;
-  border-top: 1px solid var(--rule); background: none; border-radius: 0;
-  min-width: 0;
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; text-decoration: none;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); color: var(--text);
 }
-.fcard:hover { border-top-color: var(--ink); text-decoration: none; }
-.fcard img {
-  width: 2.4rem; height: 2.4rem; border-radius: 50%; flex: none;
-  background: var(--paper-3); border: 1px solid var(--rule);
-}
-.fcard > span { min-width: 0; }
-.fcard .fn { display: block; font-size: 1rem; color: var(--ink); }
-.fcard:hover .fn { text-decoration: underline; text-underline-offset: 0.16em; }
-.fcard .fh { display: block; font-size: 0.8rem; color: var(--faint); margin-top: 0.1rem; }
+.fcard:hover { border-color: var(--line-2); color: var(--text); }
+.fcard img { width: 36px; height: 36px; border-radius: 50%; }
+.fcard .fn { display: block; font-weight: 600; font-size: 0.93rem; }
+.fcard .fh { display: block; font-size: 0.82rem; color: var(--faint); }
 
-/* ==================================================================== lists */
-
-.lists { display: grid; gap: 0 2rem; grid-template-columns: 1fr; }
-@media (min-width: 44rem) { .lists { grid-template-columns: 1fr 1fr; } }
-
+/* ---------- lists ---------- */
+.lists { display: grid; gap: 10px; grid-template-columns: 1fr; }
+@media (min-width: 700px) { .lists { grid-template-columns: 1fr 1fr; } }
 .lcard {
-  display: flex; gap: 1rem; padding: 1.1rem 0;
-  text-decoration: none; color: inherit;
-  border-top: 1px solid var(--rule); background: none; border-radius: 0;
-  min-width: 0;
+  display: flex; gap: 12px; padding: 11px; text-decoration: none; color: var(--text);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
 }
-.lcard:hover { border-top-color: var(--ink); text-decoration: none; }
+.lcard:hover { border-color: var(--line-2); color: var(--text); }
 .lcover {
-  flex: 0 0 4.25rem; height: 4.25rem; overflow: hidden; border-radius: 0;
-  background: var(--paper-3); border: 1px solid var(--rule-2);
-  display: grid; place-items: center;
+  flex: 0 0 60px; height: 60px; border-radius: 6px; overflow: hidden;
+  background: var(--surface-2); border: 1px solid var(--line); display: grid; place-items: center;
 }
 .lcover img { width: 100%; height: 100%; object-fit: cover; }
-.lcover-none { color: var(--edge); font-size: 1.3rem; line-height: 1; }
+.lcover-none { color: var(--faint); font-size: 1.3rem; }
 .lmeta { min-width: 0; }
-.lcard .lt {
-  display: block; font-size: 1.14em; line-height: 1.25; color: var(--ink);
-}
-.lcard:hover .lt { text-decoration: underline; text-underline-offset: 0.16em; }
-.lcard .rank {
-  display: inline-block; font-size: 0.5rem; color: var(--spot);
-  border: 1px solid var(--spot); border-radius: 0;
-  padding: 0.1rem 0.35rem; margin-left: 0.6rem; vertical-align: 0.18em;
-  text-decoration: none;
-}
-.lcard .ln { display: block; font-size: 0.56rem; color: var(--faint); margin-top: 0.4rem; }
-.lcard .ld {
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden; font-size: 0.92rem; font-style: italic;
-  color: var(--graphite); margin-top: 0.45rem; line-height: 1.45;
-}
-
-/* ------------------------------------------------------- a list, item by item
-   Ranked: a large numeral in the second ink, hanging in its own column.       */
+.lcard .lt { display: block; font-weight: 650; }
+.lcard .ln { display: block; font-size: 0.84rem; color: var(--muted); margin-top: 2px; }
+.lcard .ld { display: block; font-size: 0.86rem; color: var(--faint); margin-top: 4px;
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
 .litems { list-style: none; margin: 0; padding: 0; }
 .litems li {
-  display: grid; grid-template-columns: auto 3.5rem 1fr auto;
-  gap: 0.9rem; align-items: center;
-  padding: 0.9rem 0; border-bottom: 1px solid var(--rule);
+  display: grid; gap: 3px 11px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--line);
+  grid-template-columns: 46px 1fr auto;
 }
-.litems:not(.ranked) li { grid-template-columns: 3.5rem 1fr auto; }
-.litems li:first-child { border-top: 1px solid var(--rule-2); }
-.litems li:last-child { border-bottom: 1px solid var(--rule-2); }
-.litems .pos {
-  font-size: 1.25rem; font-weight: 500; color: var(--spot);
-  font-variant-numeric: lining-nums tabular-nums;
-  width: 1.5em; text-align: right; line-height: 1;
-}
+.litems.ranked li { grid-template-columns: auto 46px 1fr auto; }
+.litems li:last-child { border-bottom: 0; }
+.litems .pos { font-size: 1rem; font-weight: 700; color: var(--amber); width: 1.5em; text-align: right; }
 .ithumb {
-  width: 3.5rem; height: 3.5rem; overflow: hidden; border-radius: 0;
-  border: 1px solid var(--rule-2); background: var(--paper-3);
-  display: grid; place-items: center;
+  display: grid; place-items: center; width: 46px; height: 46px; border-radius: 6px;
+  overflow: hidden; border: 1px solid var(--line); background: var(--surface-2);
 }
 .ithumb img { width: 100%; height: 100%; object-fit: cover; }
-.ithumb:hover { border-color: var(--ink); }
-.ithumb-none { color: var(--edge); font-size: 1.1rem; line-height: 1; }
+.ithumb-none { color: var(--faint); }
 .litems .it { min-width: 0; }
-.litems .beer:hover { text-decoration: underline; text-underline-offset: 0.16em; }
-.litems .meta { display: block; font-size: 0.58rem; color: var(--faint); margin-top: 0.28rem; }
-.litems .inote {
-  display: block; font-size: 0.92rem; font-style: italic;
-  color: var(--graphite); margin-top: 0.4rem;
-}
+.litems .beer { font-weight: 600; }
+.litems .by { color: var(--muted); }
+.litems .meta { display: block; font-size: 0.83rem; color: var(--faint); }
+.litems .inote { display: block; font-size: 0.88rem; color: var(--muted); margin-top: 3px; }
+.litems .r { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.litems .stars { color: var(--amber); white-space: nowrap; }
 
-.picker { margin-top: 1.5rem; }
-.picker-new {
-  display: flex; gap: 0.7rem; flex-wrap: wrap; align-items: center; margin-top: 1.1rem;
+.picker { margin-top: 14px; }
+.picker-new { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; margin-top: 11px; }
+.picker-new input {
+  flex: 1 1 230px; font: inherit; padding: 9px 11px; color: var(--text);
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r);
 }
-.picker-new input[type="text"], .picker-new input:not([type]) {
-  flex: 1 1 13rem; min-width: 0; font: inherit; font-family: var(--serif);
-  color: var(--ink); background: transparent;
-  border: 0; border-bottom: 1px solid var(--edge); border-radius: 0;
-  padding: 0.55rem 0.15rem;
-}
-.picker-new input::placeholder { color: var(--faint); font-style: italic; opacity: 1; }
-.picker-new input:focus {
-  outline: 2px solid var(--spot); outline-offset: 3px;
-  border-color: var(--spot); border-bottom-width: 2px;
-}
-.rank-toggle {
-  font-size: 0.6rem; color: var(--graphite);
-  display: flex; align-items: center; gap: 0.45rem; cursor: pointer;
-}
-.rank-toggle input[type="checkbox"] { accent-color: var(--spot); margin: 0; }
+.picker-new input:focus { outline: 2px solid var(--amber-fill); outline-offset: -1px; }
 
-.beer-acts { display: flex; gap: 0.7rem; flex-wrap: wrap; margin-top: 2.5rem; }
-
-/* ================================================================ long copy
-   The privacy page is the one place this is a document rather than an app, so
-   it gets the full treatment: a narrow measure, an italic standfirst, and a
-   drop cap on the opening paragraph.                                         */
-
-.wrap.prose { max-width: 44rem; }
-.prose p {
-  color: var(--graphite); margin: 0 0 0.95rem; max-width: 36em; line-height: 1.68;
-}
-.prose p strong { color: var(--ink); font-weight: 600; }
-.prose .hero p { font-size: 1.16em; font-style: italic; color: var(--graphite); }
-.prose section:nth-of-type(2) > p:first-of-type::first-letter {
-  float: left; font-size: 3.4em; line-height: 0.78; font-weight: 500;
-  color: var(--spot); margin: 0.06em 0.12em 0 0;
-}
-.prose code {
-  font-family: var(--mono); font-size: 0.82em; color: var(--ink);
-  background: var(--paper-3); border-radius: 0; padding: 0.1em 0.35em;
-  letter-spacing: 0;
-}
-.prose a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.18em; }
-
-.tbl { width: 100%; border-collapse: collapse; margin: 0 0 1.1rem; }
-.tbl th, .tbl td {
-  text-align: left; vertical-align: baseline;
-  padding: 0.9rem 1.1rem 0.9rem 0; border-bottom: 1px solid var(--rule);
-}
-.tbl th {
-  font-size: 0.6rem; color: var(--ink); font-weight: 600;
-  width: 30%; white-space: normal; padding-right: 1.6rem;
-}
-.tbl td { color: var(--graphite); font-size: 0.96em; line-height: 1.6; }
-.tbl tr:first-child th, .tbl tr:first-child td { border-top: 1px solid var(--rule-2); }
-@media (max-width: 37.5rem) {
-  .tbl th, .tbl td { display: block; border-bottom: 0; padding: 0.15rem 0; }
-  .tbl th { width: auto; padding-top: 0.9rem; }
-  .tbl td { padding-bottom: 1.1rem; border-bottom: 1px solid var(--rule); }
-  .tbl tr:first-child td { border-top: 0; }
-  .tbl tr:first-child th { border-top: 1px solid var(--rule-2); }
-}
-
-/* ============================================================= the endmatter
-   Deletion gets a marginal rule in oxblood — the editorial equivalent of a
-   red pencil down the side of the column.                                    */
-
-.panel.danger {
-  border-color: var(--rule);
-  border-left: 3px solid var(--oxblood);
-  padding-left: 1.2rem;
-}
-@media (min-width: 40rem) { .panel.danger { padding-left: 1.6rem; } }
-.panel.danger .hint { font-size: 0.9rem; font-style: italic; color: var(--faint); }
-
-/* ==================================================================== the map
-   The map is a plate: flush inside a 1px frame, with a caption below it.
-   The basemap (mapstyle.js) is dark in both stocks, so on ivory it reads as a
-   printed photogravure inset — which is exactly right for an atlas page.      */
-
-.maptabs { margin-bottom: 1.25rem; }
-.maptabs .chip { text-decoration: none; }
-
-.mapwrap {
-  background: var(--paper-3);
-  border: 1px solid var(--ink); border-radius: 0;
-  padding: 0; overflow-x: auto; overflow-y: hidden;
-}
-.mapnote {
-  font-size: 0.88rem; color: var(--faint); margin: 0.7rem 0 0;
-}
-
-/* The hand-rolled SVG fallback: an engraved atlas, not a screen. It is wider
-   than a phone on purpose and scrolls inside .mapwrap — never the page. */
-.worldmap { display: block; width: 100%; min-width: 620px; height: auto; }
-.worldmap .land path {
-  fill: var(--paper); stroke: var(--edge); stroke-width: 0.6;
-  vector-effect: non-scaling-stroke;
-}
-.worldmap .pins circle { fill: var(--spot); opacity: 0.9; }
-.worldmap .pins .halo { fill: var(--spot); opacity: 0.14; }
-.worldmap .pin { cursor: pointer; }
-.worldmap .pin:hover circle { fill: var(--ink); opacity: 1; }
-.worldmap .pin:hover .halo { opacity: 0.28; }
-
-#glmap { width: 100%; height: min(66vh, 34rem); overflow: hidden; }
-
-.glpin {
-  padding: 0; border: 2px solid var(--paper); border-radius: 50%; cursor: pointer;
-  background: var(--spot); box-shadow: 0 0 0 3px rgba(138, 83, 20, 0.28);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .glpin { transition: transform 0.15s ease; }
-  .glpin:hover { transform: scale(1.16); }
-}
-.glpin:hover { background: var(--spot-2); }
-
-/* MapLibre furniture, re-set on our stock. A paper caption card over a dark
-   plate is how a printed atlas annotates one. */
-.maplibregl-popup-content {
-  background: var(--paper); color: var(--ink);
-  border: 1px solid var(--ink); border-radius: 0;
-  padding: 0.75rem 0.9rem;
-  font-family: var(--serif); font-size: 0.9rem; line-height: 1.45;
-  box-shadow: 0 10px 26px rgba(25, 21, 16, 0.28);
-}
-.maplibregl-popup-content strong {
-  display: block; font-size: 1.02rem; font-weight: 600; margin-bottom: 0.2rem;
-}
-.maplibregl-popup-content span {
-  display: block; color: var(--faint); font-size: 0.8rem;
-}
-.maplibregl-popup-content a { color: var(--spot); }
-.maplibregl-popup-tip {
-  border-top-color: var(--paper) !important;
-  border-bottom-color: var(--paper) !important;
-  border-left-color: var(--paper) !important;
-  border-right-color: var(--paper) !important;
-}
-.maplibregl-ctrl-group {
-  background: var(--paper) !important;
-  border: 1px solid var(--ink) !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-}
-.maplibregl-ctrl-group button { border-radius: 0 !important; }
-.maplibregl-ctrl-group button + button { border-top: 1px solid var(--rule) !important; }
-.maplibregl-ctrl-attrib {
-  background: rgba(245, 240, 230, 0.9) !important;
-  font-family: var(--serif) !important; font-size: 10px !important;
-  border-radius: 0 !important;
-}
-.maplibregl-ctrl-attrib, .maplibregl-ctrl-attrib a { color: var(--graphite) !important; }
-.maplibregl-ctrl-attrib-button { filter: none; }
-
-/* ------------------------------------------------- pinning a spot, on the form */
-
-.geo { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; }
-.geo-state { font-size: 0.58rem; color: var(--faint); }
-.geo-state.on { color: var(--spot); }
-.geo-off { margin-top: 0.9rem; }
-
-/* ================================================================= tallies
-   The map's leaderboards. Its own class rather than reusing .ranked, which
-   already marks a ranked list <ol> — one class doing two jobs has caused a
-   layout bug here once already.                                              */
-
+/* ---------- tallies ---------- */
 .tally { list-style: none; margin: 0; padding: 0; }
-.tally li {
-  display: flex; align-items: baseline; gap: 0.75rem;
-  padding: 0.8rem 0; border-bottom: 1px solid var(--rule); font-size: 1rem;
+.tally li { display: flex; align-items: baseline; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.tally li:last-child { border-bottom: 0; }
+.tally .n { color: var(--faint); width: 1.6em; flex: none; font-size: 0.86rem; }
+.tally .name { flex: 1; min-width: 0; }
+.tally .count { color: var(--amber); font-weight: 600; flex: none; }        /* count = state */
+.tally .extra { font-size: 0.84rem; color: var(--faint); }
+
+/* ---------- map ---------- */
+.maptabs { margin-bottom: 12px; }
+.mapwrap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 8px; overflow-x: auto; }
+#glmap { width: 100%; height: min(62vh, 520px); border-radius: 6px; overflow: hidden; }
+.mapnote { font-size: 0.82rem; color: var(--faint); margin: 7px 0 0; }
+.worldmap { display: block; width: 100%; min-width: 600px; height: auto; }
+.worldmap .land path { fill: var(--surface-2); stroke: var(--line-2); stroke-width: 0.5; vector-effect: non-scaling-stroke; }
+.worldmap .pins circle { fill: var(--amber-fill); }
+.worldmap .pins .halo { fill: var(--amber-fill); opacity: 0.2; }
+.worldmap .pin { cursor: pointer; }
+.glpin {
+  padding: 0; border: 2px solid var(--bg); border-radius: 50%; cursor: pointer;
+  background: var(--amber-fill); box-shadow: 0 0 0 3px rgba(229,163,62,0.25);
 }
-.tally li:first-child { border-top: 1px solid var(--rule-2); }
-.tally li:last-child { border-bottom: 1px solid var(--rule-2); }
-.tally .n {
-  font-size: 0.6rem; color: var(--faint); width: 1.8em; flex: none; text-align: right;
+.glpin:hover { filter: brightness(1.1); }
+.maplibregl-popup-content {
+  background: var(--surface); color: var(--text); border: 1px solid var(--line-2);
+  border-radius: var(--r); padding: 10px 12px; font-family: var(--sans); font-size: 0.88rem;
 }
-.tally .name { flex: 1; min-width: 0; color: var(--ink); }
-.tally .count {
-  font-size: 0.72rem; color: var(--spot); flex: none;
+.maplibregl-popup-content strong { display: block; margin-bottom: 2px; }
+.maplibregl-popup-content span { display: block; color: var(--muted); font-size: 0.83rem; }
+.maplibregl-popup-content a { color: var(--amber); }
+.maplibregl-ctrl-group { background: var(--surface) !important; border: 1px solid var(--line-2) !important; }
+.maplibregl-ctrl-attrib { background: color-mix(in srgb, var(--bg) 86%, transparent) !important; font-size: 10px !important; }
+.maplibregl-ctrl-attrib a { color: var(--muted) !important; }
+
+/* ---------- landing ---------- */
+.gate { display: grid; place-items: center; padding: 54px 0 30px; text-align: center; }
+.gate-inner { max-width: 560px; }
+.glass { font-size: 2.6rem; margin: 0 0 10px; }
+.gate h1 { font-size: clamp(2.1rem, 8vw, 3rem); letter-spacing: -0.025em; margin: 0 0 6px; }
+.gate .tag { color: var(--muted); margin: 0 0 16px; }
+.pitch { color: var(--muted); font-size: 1.03rem; margin: 0 auto 24px; max-width: 44ch; }
+.signin { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.fine { font-size: 0.85rem; color: var(--faint); margin-top: 20px; }
+.threeup { display: grid; gap: 20px; grid-template-columns: 1fr; margin: 44px 0 0; text-align: left; }
+@media (min-width: 760px) { .threeup { grid-template-columns: repeat(3, 1fr); } }
+.threeup h4 { font-size: 0.95rem; margin: 0 0 5px; }
+.threeup p { font-size: 0.91rem; color: var(--muted); margin: 0; }
+
+/* ---------- prose (privacy) ---------- */
+.prose { max-width: 700px; }
+.prose p { color: var(--muted); margin: 0 0 11px; }
+.prose p strong { color: var(--text); }
+.prose code {
+  font-family: var(--mono); font-size: 0.86em; background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; color: var(--text);
 }
-.tally .extra { font-size: 0.86rem; color: var(--faint); }
-.tally .extra a { color: var(--graphite); text-decoration: none; }
-.tally .extra a:hover { color: var(--spot); text-decoration: none; }
+.tbl { width: 100%; border-collapse: collapse; margin: 0 0 12px; }
+.tbl th, .tbl td { text-align: left; vertical-align: top; padding: 10px 14px 10px 0; border-bottom: 1px solid var(--line); }
+.tbl th { font-size: 0.88rem; font-weight: 650; color: var(--text); white-space: nowrap; width: 1%; padding-right: 20px; }
+.tbl td { color: var(--muted); font-size: 0.93rem; }
+@media (max-width: 600px) {
+  .tbl th, .tbl td { display: block; border-bottom: 0; padding: 2px 0; }
+  .tbl td { padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+}
+.panel.danger { border-color: color-mix(in srgb, var(--red) 40%, var(--line)); }
 
-/* ============================================================================
-   THE SAME SETTING, ON DARK STOCK
-   Only the ink changes. Every rule, measure and letterspace above holds.
-   Contrast, measured against #14120E / panel #1B1813:
-     ink      #efe7d8   15.23 : 1  /  14.40 : 1
-     graphite #a79c8a    6.92 : 1  /   6.54 : 1
-     faint    #948873    5.37 : 1  /   5.08 : 1   (4.69 : 1 in a field well)
-     spot     #d9a253    8.23 : 1  /   7.79 : 1
-     oxblood  #e5837a    7.00 : 1  /   6.12 : 1
-     stock on spot                     8.23 : 1   (primary button)
-     edge     #6f6553    3.26 : 1  /   3.09 : 1   (field rules, unlit stars)
-   ========================================================================= */
+/* ---------- footer ---------- */
+.foot {
+  border-top: 1px solid var(--line); margin-top: 48px; padding: 18px 0 32px;
+  font-size: 0.85rem; color: var(--faint);
+  display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.foot a { color: var(--faint); }
+.foot a:hover { color: var(--amber); }
+.beer-acts { display: flex; gap: 9px; flex-wrap: wrap; }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-
-    --paper:    #14120e;
-    --paper-2:  #1b1813;
-    --paper-3:  #241f18;
-    --ink:      #efe7d8;
-    --graphite: #a79c8a;
-    --faint:    #948873;
-    --edge:     #6f6553;
-    --rule:     #332c22;
-    --rule-2:   #4a4133;
-    --spot:     #d9a253;
-    --spot-2:   #f0b96f;
-    --oxblood:  #e5837a;
-
-    --grain: 0.035;
-    --caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7' viewBox='0 0 11 7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' fill='none' stroke='%23a79c8a' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  }
-
-  /* Everything reversed above already reads `var(--paper)` for its text, so it
-     follows the stock on its own. Only the two hard-coded alphas need saying
-     again — you cannot put a variable inside rgba(). */
-  .chip-on .n { border-left-color: rgba(20, 18, 14, 0.35); }
-
-  .ac { box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6); }
-  .maplibregl-popup-content { box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55); }
-  .maplibregl-ctrl-attrib { background: rgba(20, 18, 14, 0.85) !important; }
-
-  /* MapLibre ships dark control glyphs for light UI; flip them for dark. */
-  .maplibregl-ctrl-group button span { filter: invert(1) brightness(1.7); }
-
-  .glpin { box-shadow: 0 0 0 3px rgba(217, 162, 83, 0.22); }
+/* ---------- phones ---------- */
+@media (max-width: 620px) {
+  .masthead { padding: 11px 0; }
+  .masthead .wrap { gap: 8px; }
+  .site-nav { gap: 3px 13px; }
+  .site-nav a, .site-nav button { font-size: 0.86rem; }
+  .site-nav .cta { padding: 6px 11px; font-size: 0.86rem; }
+  .hero { padding: 18px 0 4px; }
+  .tiles { grid-template-columns: 1fr 1fr; }
+  /* Long beer + brewery + handle strings need to break somewhere sensible. */
+  .pours .t, .litems .it { overflow-wrap: anywhere; }
+  .phead { gap: 12px; }
+  .phead img { width: 52px; height: 52px; }
+  .phead-act { margin-left: 0; width: 100%; }
+  .phead-act .btn { width: 100%; text-align: center; }
 }
