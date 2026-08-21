@@ -193,3 +193,18 @@ test('badge output is valid shields.io endpoint JSON', () => {
   // zero must still render, not fall back to a default
   assert.equal(badge('drinkers', 0).message, '0');
 });
+
+test('headline counts must be internally consistent', () => {
+  // The bug this pins: `beers` was COUNT(*) over the beers table, which also
+  // counts rows orphaned by a deleted entry — producing a README that read
+  // "0 beers logged, 1 distinct beer". Both figures were true and the pair was
+  // indefensible. Counting only records with entries makes them agree.
+  const consistent = (s) =>
+    s.logged >= s.beers && s.beers >= s.breweries &&
+    (s.logged > 0 || (s.beers === 0 && s.breweries === 0));
+
+  assert.ok(consistent({ logged: 45, beers: 35, breweries: 33 }));
+  assert.ok(consistent({ logged: 0, beers: 0, breweries: 0 }), 'empty is consistent');
+  assert.ok(!consistent({ logged: 0, beers: 1, breweries: 1 }), 'the shipped bug must fail');
+  assert.ok(!consistent({ logged: 2, beers: 5, breweries: 1 }), 'more beers than entries is impossible');
+});

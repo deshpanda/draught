@@ -712,11 +712,18 @@ async function beerPage(env, brewerySlug, beerSlug, viewer) {
 // Public aggregate counts. Nothing here identifies anyone — they are the four
 // numbers you'd put on a README, and they are cached at the edge because a
 // badge in a README gets fetched by every visitor's proxy.
+// `beers` and `breweries` count only records somebody has actually logged
+// against. A plain COUNT(*) over those tables also counts orphans: deleting an
+// entry deliberately keeps its brewery and beer, because other people's entries
+// point at them. That is right for the data and wrong for a headline number —
+// it produced a README reading "0 beers logged, 1 distinct beer", which is
+// indefensible even though both figures were technically true.
 const STATS_SQL = `
-  SELECT (SELECT COUNT(*) FROM users WHERE handle IS NOT NULL) AS drinkers,
-         (SELECT COUNT(*) FROM pours)                          AS logged,
-         (SELECT COUNT(*) FROM beers)                          AS beers,
-         (SELECT COUNT(*) FROM breweries)                      AS breweries`;
+  SELECT (SELECT COUNT(*) FROM users WHERE handle IS NOT NULL)   AS drinkers,
+         (SELECT COUNT(*) FROM pours)                            AS logged,
+         (SELECT COUNT(DISTINCT beer_id) FROM pours)             AS beers,
+         (SELECT COUNT(DISTINCT b.brewery_id)
+            FROM pours p JOIN beers b ON b.id = p.beer_id)       AS breweries`;
 
 const CACHE = { 'cache-control': 'public, max-age=60, s-maxage=600' };
 

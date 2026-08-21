@@ -282,6 +282,26 @@ schema never anticipated — "with dad", "too warm", "birthday", "session" — a
 bodies — the error was a confusing "Which brewery?". Collection handlers need
 `!route[1]`; sub-resources need their own guard.
 
+## Counting things honestly
+
+`GET /api/stats` and `GET /api/badge` power the README's live figures. The
+counting rule is not the obvious one:
+
+```sql
+(SELECT COUNT(DISTINCT beer_id) FROM pours)                       AS beers
+(SELECT COUNT(DISTINCT b.brewery_id)
+   FROM pours p JOIN beers b ON b.id = p.beer_id)                 AS breweries
+```
+
+A plain `COUNT(*) FROM beers` also counts **orphans**. Deleting an entry
+deliberately keeps its brewery and beer, because other people's entries point at
+them — right for the data, wrong for a headline number. Shipped as `COUNT(*)`, it
+produced a README reading *"0 beers logged, 1 distinct beer"*: both figures true,
+the pair indefensible.
+
+`drinkers` counts only users with a claimed handle, since a half-finished OAuth
+row is not a person who uses this.
+
 ## Explicit non-goals
 
 No badges, streaks or check-in mechanics. No ads. No email storage. No

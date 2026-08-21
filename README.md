@@ -12,8 +12,10 @@ Those four are live, not hand-typed — `GET /api/badge?metric=…` returns
 [shields.io endpoint JSON](https://shields.io/badges/endpoint-badge) straight out
 of the database. `GET /api/stats` returns the same numbers as plain JSON if you'd
 rather read them directly. Both are aggregate only; nothing there identifies
-anyone, and `drinkers` counts people who finished signing up by claiming a
-username.
+anyone. `drinkers` counts people who finished signing up by claiming a username,
+and the beer and brewery figures count only records somebody has actually logged
+against — a deleted entry deliberately leaves its beer behind, and counting those
+orphans once produced a README reading "0 beers logged, 1 distinct beer".
 
 **Live: [ondraught.pages.dev](https://ondraught.pages.dev)**
 
