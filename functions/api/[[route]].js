@@ -6,6 +6,8 @@
 //   PATCH  /api/profile             { name, bio }
 //   GET    /api/auth/:provider      -> redirect to provider
 //   GET    /api/auth/:provider/callback
+//   GET    /api/search?q=              beers + breweries + people, one box
+//   GET    /api/breweries/:slug       a brewery and everything logged from it
 //   GET    /api/search/breweries?q=
 //   GET    /api/search/beers?q=
 //   POST   /api/pours               { brewery, beer, style, abv, rating, note, serving, venue, drunkOn }
@@ -110,6 +112,16 @@ export async function onRequest(context) {
       const capped = await guard(env, 'placeSearch', actorOf(request, null));
       if (capped) return capped;
       return places.search(env, url);
+    }
+
+    if (route[0] === 'search' && !route[1] && method === 'GET') {
+      const capped = await guard(env, 'brewerySearch', actorOf(request, null));
+      if (capped) return capped;
+      return search(env, url.searchParams.get('q') || '');
+    }
+
+    if (route[0] === 'breweries' && route[1] && method === 'GET') {
+      return breweryPage(env, route[1]);
     }
 
     if (route[0] === 'venues' && route[1] === 'search' && method === 'GET') {
@@ -538,6 +550,66 @@ async function beerPage(env, brewerySlug, beerSlug) {
       brewery: beer.brewery, brewerySlug: beer.brewery_slug, country: beer.country, city: beer.city,
     },
     stats: agg, histogram: hist, pours: pours.results,
+  });
+}
+
+// One box, three kinds of answer. Beers rank first because that is what people
+// are usually looking for; a bare handle match jumps to the top of people.
+async function search(env, rawQuery) {
+  const q = clean(rawQuery, 60);
+  if (q.length < 2) return json({ beers: [], breweries: [], people: [] });
+  const like = `%${q}%`;
+
+  const [beers, breweries, people] = await Promise.all([
+    env.DB.prepare(
+      `SELECT b.name, b.slug, b.style, b.abv, b.photo_key,
+              br.name AS brewery, br.slug AS brewery_slug,
+              COUNT(p.id) AS pours, ROUND(AVG(p.rating), 2) AS avg
+       FROM beers b JOIN breweries br ON br.id = b.brewery_id
+       LEFT JOIN pours p ON p.beer_id = b.id
+       WHERE b.name LIKE ? OR br.name LIKE ?
+       GROUP BY b.id ORDER BY pours DESC, b.name LIMIT 20`
+    ).bind(like, like).all(),
+    env.DB.prepare(
+      `SELECT br.name, br.slug, br.country, br.city, COUNT(DISTINCT b.id) AS beers
+       FROM breweries br LEFT JOIN beers b ON b.brewery_id = br.id
+       WHERE br.name LIKE ? GROUP BY br.id ORDER BY beers DESC LIMIT 10`
+    ).bind(like).all(),
+    env.DB.prepare(
+      `SELECT u.handle, u.name, u.avatar, COUNT(p.id) AS pours
+       FROM users u LEFT JOIN pours p ON p.user_id = u.id
+       WHERE u.handle IS NOT NULL AND (u.handle LIKE ? OR u.name LIKE ?)
+       GROUP BY u.id ORDER BY (u.handle = ?) DESC, pours DESC LIMIT 10`
+    ).bind(like, like, q.toLowerCase()).all(),
+  ]);
+
+  return json({ q, beers: beers.results, breweries: breweries.results, people: people.results });
+}
+
+// A brewery page. Brewery names appear all over the app and led nowhere.
+async function breweryPage(env, slug) {
+  const br = await env.DB.prepare('SELECT * FROM breweries WHERE slug = ?').bind(String(slug)).first();
+  if (!br) return bad('No such brewery.', 404);
+
+  const [beers, stats] = await Promise.all([
+    env.DB.prepare(
+      `SELECT b.name, b.slug, b.style, b.abv, b.photo_key,
+              COUNT(p.id) AS pours, COUNT(DISTINCT p.user_id) AS drinkers,
+              ROUND(AVG(p.rating), 2) AS avg
+       FROM beers b LEFT JOIN pours p ON p.beer_id = b.id
+       WHERE b.brewery_id = ?
+       GROUP BY b.id ORDER BY pours DESC, b.name LIMIT 200`
+    ).bind(br.id).all(),
+    env.DB.prepare(
+      `SELECT COUNT(DISTINCT b.id) AS beers, COUNT(p.id) AS pours,
+              COUNT(DISTINCT p.user_id) AS drinkers, ROUND(AVG(p.rating), 2) AS avg
+       FROM beers b LEFT JOIN pours p ON p.beer_id = b.id WHERE b.brewery_id = ?`
+    ).bind(br.id).first(),
+  ]);
+
+  return json({
+    brewery: { name: br.name, slug: br.slug, country: br.country, city: br.city },
+    stats, beers: beers.results,
   });
 }
 

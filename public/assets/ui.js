@@ -48,7 +48,7 @@ export function pourRow(p, { who = false, mine = false } = {}) {
     <span class="d">${esc(fmtDate(p.drunk_on))}</span>
     <span class="t">
       <a class="beer" href="${esc(beerUrl)}">${esc(p.beer)}</a>
-      <span class="by">· ${esc(p.brewery)}</span>
+      <span class="by">· <a href="/brewery/${encodeURIComponent(p.brewery_slug)}">${esc(p.brewery)}</a></span>
       ${who && p.handle ? `<span class="by">· <a href="/@${esc(p.handle)}">@${esc(p.handle)}</a></span>` : ''}
       ${bits.length ? `<span class="meta">${esc(bits.join(' · '))}</span>` : ''}
     </span>

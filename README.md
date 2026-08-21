@@ -42,6 +42,8 @@ Draught takes that axis:
 | `/map` | The map — pinned venues, filtered to everyone, your people, or just you |
 | `/recent` | **Everyone** — the last forty beers logged, by anyone |
 | `/lists` | **Lists** — collections and rankings from everyone |
+| `/search?q=` | One box: beers, breweries and people |
+| `/brewery/:slug` | A brewery and every beer logged from it |
 | `/settings` | Display name and bio |
 
 ## Architecture

@@ -201,6 +201,33 @@ The nav also shed two items: Settings and Sign out moved onto the settings page,
 reached by clicking your own name. Six items became five, and the five are words
 anyone can read cold.
 
+## Auditing for unreachable features
+
+Sign out once became unreachable: it was moved off the nav onto the settings
+page, which was itself only reachable via a button labelled "Edit profile".
+The endpoint worked, the page worked, and the job was impossible.
+
+That failure has a shape worth testing for — *a capability with no path to it* —
+and it is checkable rather than a matter of taste:
+
+1. List the endpoints the API implements.
+2. List the methods the client exposes.
+3. For each client method, grep for a caller in `app.js` **and `ui.js`** (helpers
+   like `bindFollow` receive `api` as an argument, so checking one file gives
+   false positives).
+4. Anything exposed with no caller is a feature nobody can reach.
+
+Run against the finished app this found three: `updateList` had no caller at all
+(no way to rename a list), `PUT /api/lists/:id/order` had no client method (a
+list could be marked *ranked* but never ordered — the concept was broken), and
+`searchBeers` was only called inside the log form, so there was no way to reach a
+beer's page without logging it.
+
+Walking the routes and enumerating buttons and links per page found the rest:
+"Log this beer" pointed at a bare `/log`, dropping you on an empty form, and
+brewery names were plain text everywhere despite being the natural second axis
+of the whole app.
+
 ## Explicit non-goals
 
 No badges, streaks or check-in mechanics. No ads. No email storage. No

@@ -42,6 +42,9 @@ export const api = {
   deleteAccount: () => req('/account', { method: 'DELETE' }),
   searchVenues: (q) => req(`/venues/search?q=${encodeURIComponent(q)}`),
   map: (scope) => req(`/map?scope=${encodeURIComponent(scope)}`),
+  search: (q) => req(`/search?q=${encodeURIComponent(q)}`),
+  brewery: (slug) => req(`/breweries/${encodeURIComponent(slug)}`),
+  reorderList: (id, order) => req(`/lists/${id}/order`, { method: 'PUT', body: { order } }),
   places: (q, near) => req(`/places?q=${encodeURIComponent(q)}${
     near ? `&lat=${near.lat}&lon=${near.lon}` : ''}`),
 };

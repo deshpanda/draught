@@ -398,3 +398,16 @@ button.chip { font: inherit; cursor: pointer; }
 .menu-pop a:hover, .menu-pop button:hover { background: var(--line-2); color: var(--text); }
 .menu-pop button { border-top: 1px solid var(--line); color: var(--muted); }
 .menu-pop button:hover { color: var(--red); }
+
+/* ---------- search in the top bar ---------- */
+.navsearch { display: flex; }
+.navsearch input {
+  font: inherit; font-size: 0.85rem; width: 190px; padding: 7px 11px;
+  color: var(--text); background: var(--surface-2); border: 1px solid transparent;
+  border-radius: var(--r);
+}
+.navsearch input::placeholder { color: var(--faint); }
+.navsearch input:focus { outline: 0; border-color: var(--amber); width: 230px; }
+@media (max-width: 620px) { .navsearch { order: 99; width: 100%; } .navsearch input { width: 100%; } }
+.rowacts { display: inline-flex; gap: 4px; align-items: center; }
+.rowacts .kill:disabled { opacity: 0.3; cursor: not-allowed; }

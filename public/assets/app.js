@@ -27,6 +27,9 @@ function parse(pathname) {
   if (path === '/settings') return { view: 'settings' };
   if (path === '/privacy') return { view: 'privacy' };
   if (path === '/map') return { view: 'map' };
+  if (path === '/search') return { view: 'search' };
+  const brew = path.match(/^\/brewery\/([^/]+)$/);
+  if (brew) return { view: 'brewery', slug: brew[1] };
 
   const list = path.match(/^\/@([^/]+)\/list\/([^/]+)$/);
   if (list) return { view: 'list', handle: list[1].toLowerCase(), slug: list[2] };
@@ -69,6 +72,10 @@ function renderNav() {
     nav.innerHTML = `<a href="/recent"${on('/recent')}>Everyone</a>
       <a href="/lists"${on('/lists')}>Lists</a>
       <a href="/map"${on('/map')}>Map</a>
+      <form class="navsearch" id="navSearch" role="search">
+        <input type="search" name="q" placeholder="Search beers, breweries, people"
+          aria-label="Search" value="${esc(new URLSearchParams(location.search).get('q') || '')}">
+      </form>
       <a class="cta" href="/api/auth/google" data-raw>Sign in</a>`;
     return;
   }
@@ -90,10 +97,20 @@ function renderNav() {
         <button id="signout">Sign out</button>
       </span>
     </span>` : ''}
+    <form class="navsearch" id="navSearch" role="search">
+      <input type="search" name="q" placeholder="Search beers, breweries, people"
+        aria-label="Search" value="${esc(new URLSearchParams(location.search).get('q') || '')}">
+    </form>
     <a class="cta" href="/log">+ Log</a>`;
 
   // Account menu. Sign out has to be reachable in one click from anywhere —
   // burying it on the settings page behind "Edit profile" made it unfindable.
+  nav.querySelector('#navSearch')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const q = e.target.q.value.trim();
+    if (q) go(`/search?q=${encodeURIComponent(q)}`);
+  });
+
   const btn = nav.querySelector('#meBtn');
   const pop = nav.querySelector('#mePop');
   if (btn && pop) {
@@ -292,6 +309,18 @@ function viewLog() {
   const form = app.querySelector('#pform');
   const msg = app.querySelector('#msg');
   bindStarRail(app);
+
+  // Arriving from a beer page: bring the beer with you. Landing on an empty
+  // form after clicking "Log this beer" is a small betrayal.
+  const pre = new URLSearchParams(location.search);
+  if (pre.get('brewery')) form.brewery.value = pre.get('brewery');
+  if (pre.get('beer')) form.beer.value = pre.get('beer');
+  if (pre.get('style')) form.style.value = pre.get('style');
+  if (pre.get('abv')) form.abv.value = pre.get('abv');
+  if (pre.get('beer')) {
+    form.brewery.dataset.pickedValue = form.brewery.value;
+    setTimeout(() => form.querySelector('#rail')?.scrollIntoView({ block: 'center' }), 60);
+  }
 
   // Prepare (and upload) the photo as soon as it's chosen, so submitting the
   // form is instant rather than waiting on a phone-sized file.
@@ -573,7 +602,8 @@ async function viewBeer(brewerySlug, beerSlug) {
   app.innerHTML = `<div class="wrap">
     ${beer.photoKey ? `<div class="hero-shot">${photoImg(beer.photoKey)}</div>` : ''}
     <section class="hero">
-      <p class="kicker">${esc(beer.brewery)}${beer.country ? ` · ${esc(beer.country)}` : ''}</p>
+      <p class="kicker"><a href="/brewery/${esc(beer.brewerySlug)}">${esc(beer.brewery)}</a>${
+        beer.country ? ` · ${esc(beer.country)}` : ''}</p>
       <h2>${esc(beer.name)}</h2>
       <p>${[beer.style, beer.abv ? `${beer.abv}% ABV` : ''].filter(Boolean).map(esc).join(' · ') || 'Style unrecorded.'}
         ${style ? `<br><span class="head-note">${esc(style.family)} · ${esc(style.origin)} · typically ${style.abvLow}–${style.abvHigh}%</span>` : ''}</p>
@@ -606,7 +636,9 @@ async function viewBeer(brewerySlug, beerSlug) {
     </section>
 
     <div class="beer-acts">
-      ${state.me ? `<a class="btn btn-amber" href="/log">Log this beer</a>` : ''}
+      ${state.me ? `<a class="btn btn-amber" href="/log?brewery=${
+        encodeURIComponent(beer.brewery)}&beer=${encodeURIComponent(beer.name)}&style=${
+        encodeURIComponent(beer.style || '')}${beer.abv ? `&abv=${beer.abv}` : ''}">Log this beer</a>` : ''}
       ${state.me?.handle ? '<button class="btn" id="addList">Add to a list</button>' : ''}
     </div>
     <div id="listPicker"></div>
@@ -874,23 +906,83 @@ async function viewList(handle, slug) {
                 ${it.note ? `<span class="inote">${esc(it.note)}</span>` : ''}
               </span>
               <span class="r"><span class="stars">${stars(it.avg ? Math.round(it.avg) : null)}</span>
-              ${mine ? `<button class="kill" data-drop="${it.beer_id}">remove</button>` : ''}</span>
+              ${mine ? `<span class="rowacts">${list.ranked ? `
+                  <button class="kill" data-up="${it.beer_id}"${i === 0 ? ' disabled' : ''} title="Move up">↑</button>
+                  <button class="kill" data-down="${it.beer_id}"${i === items.length - 1 ? ' disabled' : ''} title="Move down">↓</button>` : ''}
+                <button class="kill" data-drop="${it.beer_id}">remove</button></span>` : ''}</span>
             </li>`).join('')}</ol>`
         : `<div class="empty"><p>Nothing on this list yet.</p>
             ${mine ? '<p class="hint">Open any beer and choose “Add to a list”.</p>' : ''}</div>`}
     </section>
-    ${mine ? `<button class="btn" id="delList">Delete this list</button>` : ''}
+    ${mine ? `<div class="beer-acts">
+      <button class="btn" id="editList">Edit list</button>
+      <button class="btn btn-danger" id="delList">Delete list</button>
+    </div>
+    <div id="editPanel" hidden>
+      <div class="panel" style="max-width:520px;margin-top:14px">
+        <div class="field">
+          <label for="etitle">Title</label>
+          <input id="etitle" maxlength="80" value="${esc(list.title)}">
+        </div>
+        <div class="field">
+          <label for="edesc">Description</label>
+          <textarea id="edesc" maxlength="1000">${esc(list.description || '')}</textarea>
+        </div>
+        <label class="rank-toggle"><input type="checkbox" id="eranked"${list.ranked ? ' checked' : ''}> Ranked list</label>
+        <p class="hint">A ranked list shows positions, and you can reorder it above.</p>
+        <button class="btn btn-amber" id="saveList" style="margin-top:12px">Save</button>
+        <p class="msg" id="emsg"></p>
+      </div>
+    </div>` : ''}
   </div>`;
 
   if (!mine) return;
+
   app.querySelector('#litems')?.addEventListener('click', async (e) => {
-    const btn = e.target.closest('button[data-drop]');
-    if (!btn) return;
-    btn.disabled = true;
+    const drop = e.target.closest('button[data-drop]');
+    if (drop) {
+      drop.disabled = true;
+      try {
+        await api.removeFromList(list.id, drop.dataset.drop);
+        drop.closest('li').remove();
+      } catch { drop.disabled = false; }
+      return;
+    }
+    // Reordering a ranked list: swap with the neighbour and send the whole
+    // order, which is what the endpoint expects.
+    const move = e.target.closest('button[data-up], button[data-down]');
+    if (!move) return;
+    const up = move.hasAttribute('data-up');
+    const id = Number(up ? move.dataset.up : move.dataset.down);
+    const order = items.map((it) => it.beer_id);
+    const at = order.indexOf(id);
+    const to = up ? at - 1 : at + 1;
+    if (at < 0 || to < 0 || to >= order.length) return;
+    [order[at], order[to]] = [order[to], order[at]];
+    move.disabled = true;
     try {
-      await api.removeFromList(list.id, btn.dataset.drop);
-      btn.closest('li').remove();
-    } catch { btn.disabled = false; }
+      await api.reorderList(list.id, order);
+      viewList(handle, slug);            // redraw with the new positions
+    } catch (err) { move.disabled = false; alert(err.message); }
+  });
+
+  const editBtn = app.querySelector('#editList');
+  const panel = app.querySelector('#editPanel');
+  editBtn?.addEventListener('click', () => {
+    panel.hidden = !panel.hidden;
+    editBtn.textContent = panel.hidden ? 'Edit list' : 'Cancel';
+  });
+  app.querySelector('#saveList')?.addEventListener('click', async () => {
+    const emsg = app.querySelector('#emsg');
+    emsg.className = 'msg'; emsg.textContent = 'saving…';
+    try {
+      await api.updateList(list.id, {
+        title: app.querySelector('#etitle').value,
+        description: app.querySelector('#edesc').value,
+        ranked: app.querySelector('#eranked').checked,
+      });
+      viewList(handle, slug);
+    } catch (err) { emsg.className = 'msg err'; emsg.textContent = err.message; }
   });
   app.querySelector('#delList')?.addEventListener('click', async () => {
     if (!confirm(`Delete “${list.title}”? The beers stay, the list goes.`)) return;
@@ -1218,6 +1310,100 @@ function loadScript(src) {
   });
 }
 
+async function viewSearch() {
+  const q = (new URLSearchParams(location.search).get('q') || '').trim();
+  if (!q) {
+    app.innerHTML = `<div class="wrap"><section class="hero"><h2>Search</h2>
+      <p>Look for a beer, a brewery or a person.</p></section></div>`;
+    return;
+  }
+  loading();
+  let d;
+  try { d = await api.search(q); } catch (err) { return oops(err.message); }
+  const total = d.beers.length + d.breweries.length + d.people.length;
+
+  app.innerHTML = `<div class="wrap">
+    <section class="hero"><h2>Search</h2>
+      <p>${total ? `${plural(total, 'result')} for “${esc(q)}”` : `Nothing found for “${esc(q)}”.`}</p></section>
+
+    ${d.beers.length ? `<section class="block">
+      ${blockHead('Beers', plural(d.beers.length, 'beer'))}
+      <ul class="litems">${d.beers.map((b) => `
+        <li>
+          <a class="ithumb" href="/b/${encodeURIComponent(b.brewery_slug)}/${encodeURIComponent(b.slug)}">${
+            b.photo_key ? photoImg(b.photo_key) : '<span class="ithumb-none">▤</span>'}</a>
+          <span class="it">
+            <a class="beer" href="/b/${encodeURIComponent(b.brewery_slug)}/${encodeURIComponent(b.slug)}">${esc(b.name)}</a>
+            <span class="by">· <a href="/brewery/${encodeURIComponent(b.brewery_slug)}">${esc(b.brewery)}</a></span>
+            <span class="meta">${esc([b.style, b.abv ? `${b.abv}%` : '',
+              b.pours ? plural(b.pours, 'entry', 'entries') : 'not logged yet'].filter(Boolean).join(' · '))}</span>
+          </span>
+          <span class="r"><span class="stars">${stars(b.avg ? Math.round(b.avg) : null)}</span></span>
+        </li>`).join('')}</ul>
+    </section>` : ''}
+
+    ${d.breweries.length ? `<section class="block">
+      ${blockHead('Breweries')}
+      <div class="chips">${d.breweries.map((b) =>
+        `<a class="chip" href="/brewery/${encodeURIComponent(b.slug)}">${esc(b.name)}${
+          b.beers ? `<span class="n">${b.beers}</span>` : ''}</a>`).join('')}</div>
+    </section>` : ''}
+
+    ${d.people.length ? `<section class="block">
+      ${blockHead('People')}
+      <div class="folk">${d.people.map((u) => `
+        <a class="fcard" href="/@${esc(u.handle)}">
+          ${u.avatar ? `<img src="${esc(u.avatar)}" alt="" referrerpolicy="no-referrer">`
+                     : '<img src="/assets/favicon.svg" alt="">'}
+          <span><span class="fn">${esc(u.name || u.handle)}</span>
+          <span class="fh">@${esc(u.handle)} · ${plural(u.pours || 0, 'entry', 'entries')}</span></span>
+        </a>`).join('')}</div>
+    </section>` : ''}
+
+    ${!total ? `<div class="empty"><p>No beer, brewery or person matches that.</p>
+      ${state.me ? '<a class="btn btn-amber" href="/log">Log a beer</a>' : ''}</div>` : ''}
+  </div>`;
+}
+
+async function viewBrewery(slug) {
+  loading();
+  let d;
+  try { d = await api.brewery(slug); } catch (err) { return oops(err.message); }
+  const { brewery, stats, beers } = d;
+
+  app.innerHTML = `<div class="wrap">
+    <section class="hero">
+      ${brewery.city || brewery.country
+        ? `<p class="kicker">${esc([brewery.city, brewery.country].filter(Boolean).join(', '))}</p>` : ''}
+      <h2>${esc(brewery.name)}</h2>
+    </section>
+
+    <div class="tiles">
+      ${tile('beers', stats.beers ?? 0)}
+      ${tile('logged', stats.pours ?? 0)}
+      ${tile('people', stats.drinkers ?? 0)}
+      ${tile('average', stats.avg ? `${outOfFive(stats.avg)}★` : '—', stats.avg ? 'out of 5' : 'no ratings yet')}
+    </div>
+
+    <section class="block">
+      ${blockHead('Beers', plural(beers.length, 'beer'))}
+      ${beers.length
+        ? `<ul class="litems">${beers.map((b) => `
+            <li>
+              <a class="ithumb" href="/b/${encodeURIComponent(brewery.slug)}/${encodeURIComponent(b.slug)}">${
+                b.photo_key ? photoImg(b.photo_key) : '<span class="ithumb-none">▤</span>'}</a>
+              <span class="it">
+                <a class="beer" href="/b/${encodeURIComponent(brewery.slug)}/${encodeURIComponent(b.slug)}">${esc(b.name)}</a>
+                <span class="meta">${esc([b.style, b.abv ? `${b.abv}%` : '',
+                  b.pours ? plural(b.pours, 'entry', 'entries') : 'not logged yet'].filter(Boolean).join(' · '))}</span>
+              </span>
+              <span class="r"><span class="stars">${stars(b.avg ? Math.round(b.avg) : null)}</span></span>
+            </li>`).join('')}</ul>`
+        : '<div class="empty"><p>Nothing logged from this brewery yet.</p></div>'}
+    </section>
+  </div>`;
+}
+
 // ---- boot ------------------------------------------------------------------
 
 function render() {
@@ -1239,6 +1425,8 @@ function render() {
     case 'allLists': return viewAllLists();
     case 'privacy': return viewPrivacy();
     case 'map': return viewMap();
+    case 'search': return viewSearch();
+    case 'brewery': return viewBrewery(r.slug);
     default: return oops('There is nothing at that address.');
   }
 }
