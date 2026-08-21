@@ -53,8 +53,11 @@ export function pourRow(p, { who = false, mine = false } = {}) {
       ${bits.length ? `<span class="meta">${esc(bits.join(' · '))}</span>` : ''}
     </span>
     <span class="r">
-      <span class="stars">${stars(p.rating)}</span>
-      ${mine ? `<button class="kill" data-kill="${esc(p.id)}">remove</button>` : ''}
+      <span class="stars">${stars(p.rating)}${p.again ? '<span class="again" title="Had it before">↻</span>' : ''}</span>
+      ${mine ? `<span class="rowacts">
+        <button class="kill" data-edit="${esc(p.id)}">edit</button>
+        <button class="kill" data-kill="${esc(p.id)}">remove</button>
+      </span>` : ''}
     </span>
     ${p.note ? `<p class="note">${esc(p.note)}</p>` : ''}
   </li>`;
@@ -252,3 +255,32 @@ export function mapSvg(venues, project, view) {
     aria-label="World map of where people are drinking">${
     '<!--countries-->'}<g class="pins">${dots}</g></svg>`;
 }
+
+
+// One row shape for every list of beers — search, brewery, style, wishlist,
+// likes. They were drifting apart, which is how a UI starts feeling assembled.
+export function beerRow(b, brewerySlug = b.brewery_slug) {
+  const href = `/b/${encodeURIComponent(brewerySlug)}/${encodeURIComponent(b.slug)}`;
+  const meta = [
+    b.style, b.abv ? `${b.abv}%` : '',
+    b.pours ? plural(b.pours, 'entry', 'entries') : 'not logged yet',
+  ].filter(Boolean).join(' · ');
+  return `<li>
+    <a class="ithumb" href="${esc(href)}">${
+      b.photo_key ? photoImg(b.photo_key) : '<span class="ithumb-none">▤</span>'}</a>
+    <span class="it">
+      <a class="beer" href="${esc(href)}">${esc(b.name)}</a>
+      ${b.brewery ? `<span class="by">· <a href="/brewery/${encodeURIComponent(brewerySlug)}">${esc(b.brewery)}</a></span>` : ''}
+      <span class="meta">${esc(meta)}</span>
+    </span>
+    <span class="r"><span class="stars">${stars(b.avg ? Math.round(b.avg) : null)}</span></span>
+  </li>`;
+}
+
+// The styles worth offering as one-tap chips. Everything else is a keystroke
+// away in the datalist — a 117-item <select> was the least friendly thing here.
+export const COMMON_STYLES = [
+  'American IPA', 'Hazy IPA', 'Double IPA', 'American Pale Ale',
+  'German Pils', 'Munich Helles', 'Witbier', 'Weissbier',
+  'Irish Stout', 'Imperial Stout', 'Saison', 'Gueuze',
+];

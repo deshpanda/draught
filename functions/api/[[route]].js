@@ -11,7 +11,11 @@
 //   GET    /api/search/breweries?q=
 //   GET    /api/search/beers?q=
 //   POST   /api/pours               { brewery, beer, style, abv, rating, note, serving, venue, drunkOn }
+//   PATCH  /api/pours/:id            edit rating/note/date/serving/venue/again
 //   DELETE /api/pours/:id
+//   POST   /api/mark/:kind/:brewery/:beer   kind = like | want; DELETE to undo
+//   GET    /api/users/:handle/wishlist  and .../likes
+//   GET    /api/styles/:name           the genre page of a beer app
 //   GET    /api/users/:handle
 //   GET    /api/beers/:brewery/:beer
 //   GET    /api/recent
@@ -48,6 +52,7 @@ import { guard, actorOf } from '../_shared/ratelimit.js';
 import * as venues from '../_shared/venues.js';
 import * as places from '../_shared/places.js';
 import * as tiles from '../_shared/tiles.js';
+import * as marks from '../_shared/marks.js';
 
 export async function onRequest(context) {
   const { request, env, params } = context;
@@ -155,6 +160,11 @@ export async function onRequest(context) {
       return logPour(env, u, await request.json().catch(() => ({})));
     }
 
+    if (route[0] === 'pours' && route[1] && method === 'PATCH') {
+      const u = await requireUser(request, env);
+      return editPour(env, u, route[1], await request.json().catch(() => ({})));
+    }
+
     if (route[0] === 'pours' && route[1] && method === 'DELETE') {
       const u = await requireUser(request, env);
       return deletePour(env, u, route[1]);
@@ -181,6 +191,19 @@ export async function onRequest(context) {
       const capped = await guard(env, 'followAct', u.id);
       if (capped) return capped;
       return follow(env, u, route[1], method === 'POST');
+    }
+
+    if (route[0] === 'mark' && route[1] && route[2] && route[3]
+        && (method === 'POST' || method === 'DELETE')) {
+      const u = await requireUser(request, env);
+      if (!u.handle) return bad('Claim a username first.', 409);
+      const capped = await guard(env, 'followAct', u.id);
+      if (capped) return capped;
+      return marks.toggle(env, u, route[1], route[2], route[3], method === 'POST');
+    }
+
+    if (route[0] === 'styles' && route[1] && method === 'GET') {
+      return marks.stylePage(env, decodeURIComponent(route[1]));
     }
 
     if (route[0] === 'feed' && method === 'GET') {
@@ -226,6 +249,12 @@ export async function onRequest(context) {
     if (route[0] === 'users' && route[1] && route[2] === 'lists' && method === 'GET') {
       return lists.ofUser(env, route[1]);
     }
+    if (route[0] === 'users' && route[1] && route[2] === 'wishlist' && method === 'GET') {
+      return marks.wishlistOf(env, route[1]);
+    }
+    if (route[0] === 'users' && route[1] && route[2] === 'likes' && method === 'GET') {
+      return marks.likesOf(env, route[1]);
+    }
     if (route[0] === 'users' && route[1] && route[2] === 'people' && method === 'GET') {
       return people(env, route[1], url.searchParams.get('dir'));
     }
@@ -234,7 +263,7 @@ export async function onRequest(context) {
     }
 
     if (route[0] === 'beers' && route[1] && route[2] && method === 'GET') {
-      return beerPage(env, route[1], route[2]);
+      return beerPage(env, route[1], route[2], await currentUser(request, env));
     }
 
     if (route[0] === 'recent' && method === 'GET') {
@@ -375,6 +404,51 @@ async function logPour(env, user, body) {
   }, 201);
 }
 
+// Editing an entry. Only the fields a person can reasonably change afterwards:
+// the beer identity itself is deliberately fixed, because a pour is a record of
+// a specific thing you drank — changing which beer it was is a new entry, not an
+// edit, and silently moving it would corrupt another beer's aggregate.
+async function editPour(env, user, rawId, body) {
+  const id = Number(rawId) || 0;
+  const pour = await env.DB.prepare('SELECT * FROM pours WHERE id = ? AND user_id = ?')
+    .bind(id, user.id).first();
+  if (!pour) return bad('No such entry.', 404);
+
+  const rating = body.rating === '' || body.rating == null
+    ? null : Math.round(Number(body.rating));
+  if (rating !== null && (!Number.isFinite(rating) || rating < 1 || rating > 10)) {
+    return bad('Ratings run 1–10 (half-stars).');
+  }
+  const drunkOn = isDate(body.drunkOn) ? body.drunkOn : pour.drunk_on;
+  const photoKey = body.photoKey === undefined ? pour.photo_key
+    : (body.photoKey ? String(body.photoKey) : null);
+  if (!photoKeyOk(photoKey)) return bad('That photo reference is not one of ours.');
+
+  await env.DB.prepare(
+    `UPDATE pours SET rating = ?, note = ?, serving = ?, venue = ?, drunk_on = ?,
+                      again = ?, photo_key = ?, geo_private = ?, edited_at = ?
+     WHERE id = ? AND user_id = ?`
+  ).bind(
+    rating,
+    clean(body.note ?? pour.note, 2000),
+    clean(body.serving ?? pour.serving, 16),
+    clean(body.venue ?? pour.venue, 80),
+    drunkOn,
+    body.again ? 1 : 0,
+    photoKey,
+    body.geoPrivate ? 1 : 0,
+    now(), id, user.id
+  ).run();
+
+  // A newly attached photo can still become the beer's face if it has none.
+  if (photoKey && photoKey !== pour.photo_key) {
+    await env.DB.prepare('UPDATE beers SET photo_key = ? WHERE id = ? AND photo_key IS NULL')
+      .bind(photoKey, pour.beer_id).run();
+  }
+
+  return json({ ok: true, id, rating, drunkOn });
+}
+
 // Removing a pour has to consider its photo. If that shot happens to be the one
 // representing the beer, dropping the object would leave a broken image on a
 // page that isn't even ours — so hand the role to another drinker's photo first,
@@ -437,6 +511,8 @@ async function eraseAccount(env, user, secure) {
     env.DB.prepare('DELETE FROM list_items WHERE list_id IN (SELECT id FROM lists WHERE user_id = ?)').bind(user.id),
     env.DB.prepare('DELETE FROM lists WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM follows WHERE follower_id = ? OR followee_id = ?').bind(user.id, user.id),
+    env.DB.prepare('DELETE FROM wishlist WHERE user_id = ?').bind(user.id),
+    env.DB.prepare('DELETE FROM likes WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM pours WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id),
     env.DB.prepare('DELETE FROM rate_limits WHERE bucket LIKE ?').bind(`%:${user.id}`),
@@ -487,9 +563,10 @@ async function profile(env, handle, viewer) {
   const u = await env.DB.prepare('SELECT * FROM users WHERE handle = ?').bind(h).first();
   if (!u) return bad('No such drinker.', 404);
 
-  const [pours, stats, styles, counts, follows, listCount] = await Promise.all([
+  const [pours, stats, styles, counts, follows, listCount, marked] = await Promise.all([
     env.DB.prepare(
       `SELECT p.id, p.rating, p.note, p.drunk_on, p.serving, p.venue, p.photo_key,
+              p.again, p.geo_private, p.edited_at,
               b.name AS beer, b.slug AS beer_slug, b.style, b.abv,
               br.name AS brewery, br.slug AS brewery_slug
        FROM pours p JOIN beers b ON b.id = p.beer_id JOIN breweries br ON br.id = b.brewery_id
@@ -504,11 +581,16 @@ async function profile(env, handle, viewer) {
     followCounts(env, u.id),
     viewerFollows(env, viewer?.id, u.id),
     env.DB.prepare('SELECT COUNT(*) AS n FROM lists WHERE user_id = ?').bind(u.id).first(),
+    env.DB.prepare(
+      `SELECT (SELECT COUNT(*) FROM wishlist WHERE user_id = ?1) AS wants,
+              (SELECT COUNT(*) FROM likes WHERE user_id = ?1) AS likes`
+    ).bind(u.id).first(),
   ]);
 
   return json({
     user: publicUser(u),
-    stats: { ...stats, ...counts, lists: listCount?.n ?? 0 },
+    stats: { ...stats, ...counts, lists: listCount?.n ?? 0,
+             wants: marked?.wants ?? 0, likes: marked?.likes ?? 0 },
     viewerFollows: follows,
     isSelf: !!viewer && viewer.id === u.id,
     styles: styles.results,
@@ -516,13 +598,16 @@ async function profile(env, handle, viewer) {
   });
 }
 
-async function beerPage(env, brewerySlug, beerSlug) {
+async function beerPage(env, brewerySlug, beerSlug, viewer) {
   const beer = await env.DB.prepare(
     `SELECT b.*, br.name AS brewery, br.slug AS brewery_slug, br.country, br.city
      FROM beers b JOIN breweries br ON br.id = b.brewery_id
      WHERE br.slug = ? AND b.slug = ?`
   ).bind(String(brewerySlug), String(beerSlug)).first();
   if (!beer) return bad('No such beer.', 404);
+
+  const viewerMarks = await marks.forViewer(env, viewer?.id, beer.id);
+  const markCounts = await marks.counts(env, beer.id);
 
   const [agg, pours] = await Promise.all([
     env.DB.prepare(
@@ -531,7 +616,7 @@ async function beerPage(env, brewerySlug, beerSlug) {
        FROM pours WHERE beer_id = ?`
     ).bind(beer.id).first(),
     env.DB.prepare(
-      `SELECT p.rating, p.note, p.drunk_on, p.serving, p.photo_key,
+      `SELECT p.rating, p.note, p.drunk_on, p.serving, p.photo_key, p.again,
               u.handle, u.name AS drinker, u.avatar
        FROM pours p JOIN users u ON u.id = p.user_id
        WHERE p.beer_id = ? AND u.handle IS NOT NULL
@@ -549,7 +634,9 @@ async function beerPage(env, brewerySlug, beerSlug) {
       photoKey: beer.photo_key,
       brewery: beer.brewery, brewerySlug: beer.brewery_slug, country: beer.country, city: beer.city,
     },
-    stats: agg, histogram: hist, pours: pours.results,
+    stats: { ...agg, ...markCounts },
+    viewer: viewerMarks,
+    histogram: hist, pours: pours.results,
   });
 }
 

@@ -44,6 +44,8 @@ Draught takes that axis:
 | `/lists` | **Lists** — collections and rankings from everyone |
 | `/search?q=` | One box: beers, breweries and people |
 | `/brewery/:slug` | A brewery and every beer logged from it |
+| `/style/:name` | A style page — the genre page of a beer app |
+| `/@handle/wishlist` · `/likes` | The two shelves a rating can't express |
 | `/settings` | Display name and bio |
 
 ## Architecture

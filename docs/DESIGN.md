@@ -228,6 +228,36 @@ Walking the routes and enumerating buttons and links per page found the rest:
 brewery names were plain text everywhere despite being the natural second axis
 of the whole app.
 
+## Three judgements, not one
+
+Letterboxd keeps three independent facts about a film and Draught only had the
+first: the **rating** (how good it was), the **like** (whether you love it,
+regardless of score), and the **watchlist** (whether you mean to try it). They
+really are independent — a beer can be a technically excellent 4.5 you never want
+again, or a scrappy 3 you order every week. One number cannot carry both, which
+is why `likes` and `wishlist` are their own tables, keyed `(user_id, beer_id)` so
+toggling is idempotent.
+
+`pours.again` is the same idea applied to the entry rather than the beer — it is
+Letterboxd's *rewatch*.
+
+## Editing an entry
+
+`PATCH /api/pours/:id` changes the rating, review, date, serving, venue and the
+"had it before" flag, and stamps `edited_at`.
+
+**The beer itself is deliberately not editable.** A pour records a specific thing
+you drank; quietly moving it to a different beer would change that beer's average
+for everyone else. Logging the wrong beer means delete and re-log, and the edit
+panel says so.
+
+## Style pages
+
+The 117-style canon was decoration for weeks — every style name was dead text.
+`/style/:name` makes it the genre page of a beer app: the style's family, origin
+and typical ABV from the canon, plus every beer logged under it and how it rates.
+Style names are now links wherever they appear, exactly like brewery names.
+
 ## Explicit non-goals
 
 No badges, streaks or check-in mechanics. No ads. No email storage. No

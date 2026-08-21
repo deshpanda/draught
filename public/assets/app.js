@@ -6,6 +6,7 @@ import {
   esc, stars, outOfFive, fmtDate, today, plural,
   tile, blockHead, pourRow, starRail, bindStarRail, bindAutocomplete,
   prepPhoto, photoImg, followBtn, bindFollow, listCard, askLocation, mapSvg,
+  beerRow, COMMON_STYLES,
 } from './ui.js';
 
 const app = document.getElementById('app');
@@ -28,6 +29,10 @@ function parse(pathname) {
   if (path === '/privacy') return { view: 'privacy' };
   if (path === '/map') return { view: 'map' };
   if (path === '/search') return { view: 'search' };
+  const st = path.match(/^\/style\/(.+)$/);
+  if (st) return { view: 'style', name: decodeURIComponent(st[1]) };
+  const shelf = path.match(/^\/@([^/]+)\/(wishlist|likes)$/);
+  if (shelf) return { view: 'shelf', handle: shelf[1].toLowerCase(), kind: shelf[2] };
   const brew = path.match(/^\/brewery\/([^/]+)$/);
   if (brew) return { view: 'brewery', slug: brew[1] };
 
@@ -214,13 +219,20 @@ function viewWelcome() {
   app.querySelector('#handle').focus();
 }
 
-function styleOptions() {
-  return FAMILIES.map((fam) => {
-    const inFam = STYLES.filter((s) => s.family === fam);
-    return `<optgroup label="${esc(fam)}">${
-      inFam.map((s) => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('')
-    }</optgroup>`;
-  }).join('');
+// Type-to-filter over all 117 styles, with the dozen people actually reach for
+// as one-tap chips. The old control was a 117-option <select> — technically
+// complete and genuinely unusable on a phone.
+function styleField() {
+  return `<div class="field">
+    <label for="style">Type of beer</label>
+    <input id="style" name="style" list="stylelist" autocomplete="off"
+      placeholder="Start typing — IPA, stout, lager…" maxlength="60">
+    <datalist id="stylelist">${
+      STYLES.map((s) => `<option value="${esc(s.name)}">${esc(s.family)}</option>`).join('')}</datalist>
+    <div class="chips quickstyles" id="quickStyles">${
+      COMMON_STYLES.map((nm) => `<button type="button" class="chip" data-style="${esc(nm)}">${esc(nm)}</button>`).join('')}</div>
+    <p class="hint" id="abvHint">Pick one, or type anything. ${STYLES.length} styles known.</p>
+  </div>`;
 }
 
 function viewLog() {
@@ -242,15 +254,15 @@ function viewLog() {
           <input id="beer" name="beer" required maxlength="100" placeholder="Small DIPA">
           <div class="ac" id="acBeer"></div>
         </div>
+        ${styleField()}
         <div class="row two">
           <div class="field">
-            <label for="style">Style</label>
-            <select id="style" name="style"><option value="">—</option>${styleOptions()}</select>
+            <label for="abv">Strength (ABV %)</label>
+            <input id="abv" name="abv" type="number" step="0.1" min="0" max="70" placeholder="6.5">
           </div>
           <div class="field">
-            <label for="abv">ABV %</label>
-            <input id="abv" name="abv" type="number" step="0.1" min="0" max="70" placeholder="6.5">
-            <p class="hint" id="abvHint"></p>
+            <label for="drunkOn">When</label>
+            <input id="drunkOn" name="drunkOn" type="date" value="${today()}" max="${today()}">
           </div>
         </div>
         <div class="field">
@@ -270,25 +282,23 @@ function viewLog() {
           <textarea id="note" name="note" maxlength="2000"
             placeholder="What did it taste like? Would you have it again?"></textarea>
         </div>
-        <div class="row three">
-          <div class="field">
-            <label for="drunkOn">Date</label>
-            <input id="drunkOn" name="drunkOn" type="date" value="${today()}" max="${today()}">
+        <div class="field">
+          <label>How did it come?</label>
+          <div class="chips serving" id="servingChips">
+            ${['draught', 'can', 'bottle', 'cask'].map((v) =>
+              `<button type="button" class="chip" data-serving="${v}">${v}</button>`).join('')}
           </div>
-          <div class="field">
-            <label for="serving">Serving</label>
-            <select id="serving" name="serving">
-              <option value="">—</option><option>draught</option><option>cask</option>
-              <option>can</option><option>bottle</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="venue">Where</label>
-            <input id="venue" name="venue" maxlength="80"
-              placeholder="Search a bar, or type any name" autocomplete="off">
-            <div class="ac" id="acVenue"></div>
-          </div>
+          <input type="hidden" id="serving" name="serving" value="">
         </div>
+        <div class="field">
+          <label for="venue">Where</label>
+          <input id="venue" name="venue" maxlength="80"
+            placeholder="Search a bar, or type any name" autocomplete="off">
+          <div class="ac" id="acVenue"></div>
+        </div>
+        <label class="rank-toggle" style="margin-bottom:14px">
+          <input type="checkbox" id="again"> I've had this before
+        </label>
         <div class="field">
           <div class="geo">
             <button type="button" class="btn" id="pin">Pin this spot</button>
@@ -317,6 +327,8 @@ function viewLog() {
   if (pre.get('beer')) form.beer.value = pre.get('beer');
   if (pre.get('style')) form.style.value = pre.get('style');
   if (pre.get('abv')) form.abv.value = pre.get('abv');
+  if (pre.get('style')) setTimeout(() => app.querySelector('#style')
+    ?.dispatchEvent(new Event('input', { bubbles: true })), 0);
   if (pre.get('beer')) {
     form.brewery.dataset.pickedValue = form.brewery.value;
     setTimeout(() => form.querySelector('#rail')?.scrollIntoView({ block: 'center' }), 60);
@@ -344,13 +356,37 @@ function viewLog() {
     }
   });
 
-  // Style choice suggests the ABV band, but never overwrites a typed value.
+  // Naming a style tells us its usual strength and where it comes from. Never
+  // overwrite a typed ABV — the bottle in their hand beats the style guide.
   const styleSel = form.style;
   const abv = form.abv;
   const abvHint = app.querySelector('#abvHint');
-  styleSel.addEventListener('change', () => {
-    const s = findStyle(styleSel.value);
-    abvHint.textContent = s ? `${s.origin} · typically ${s.abvLow}–${s.abvHigh}%` : '';
+  const describeStyle = () => {
+    const st = findStyle(styleSel.value);
+    abvHint.textContent = st
+      ? `${st.family} · ${st.origin} · usually ${st.abvLow}–${st.abvHigh}%`
+      : `Pick one, or type anything. ${STYLES.length} styles known.`;
+    app.querySelectorAll('#quickStyles .chip').forEach((c) =>
+      c.classList.toggle('chip-on', c.dataset.style === styleSel.value));
+  };
+  styleSel.addEventListener('input', describeStyle);
+  styleSel.addEventListener('change', describeStyle);
+  app.querySelector('#quickStyles').addEventListener('click', (e) => {
+    const c = e.target.closest('button[data-style]');
+    if (!c) return;
+    styleSel.value = c.dataset.style === styleSel.value ? '' : c.dataset.style;
+    describeStyle();
+  });
+
+  // Serving is four options; chips beat a dropdown on a phone.
+  const servingInput = app.querySelector('#serving');
+  app.querySelector('#servingChips').addEventListener('click', (e) => {
+    const c = e.target.closest('button[data-serving]');
+    if (!c) return;
+    const same = servingInput.value === c.dataset.serving;
+    servingInput.value = same ? '' : c.dataset.serving;
+    app.querySelectorAll('#servingChips .chip').forEach((x) =>
+      x.classList.toggle('chip-on', !same && x === c));
   });
 
   // The venue field searches two things at once: places people here have
@@ -491,7 +527,8 @@ function viewLog() {
         rating: form.rating.value,
         photoKey,
         note: form.note.value,
-        serving: form.serving.value,
+        serving: servingInput.value,
+        again: app.querySelector('#again').checked,
         venueName: form.venue.value,
         lat: pinned?.lat, lon: pinned?.lon,
         venueCity: form.venue.dataset.city || '',
@@ -532,6 +569,8 @@ async function viewProfile(handle) {
           <a href="/@${esc(user.handle)}/followers">${plural(stats.followers ?? 0, 'follower')}</a>
           · <a href="/@${esc(user.handle)}/following">${stats.following ?? 0} following</a>
           · <a href="/@${esc(user.handle)}/lists">${plural(stats.lists ?? 0, 'list')}</a>
+          · <a href="/@${esc(user.handle)}/wishlist">${stats.wants ?? 0} to try</a>
+          · <a href="/@${esc(user.handle)}/likes">${stats.likes ?? 0} liked</a>
         </p>
       </div>
       <span class="phead-act">
@@ -558,7 +597,8 @@ async function viewProfile(handle) {
 
     ${styles.length ? `<section class="block">
       ${blockHead('Styles', `${styles.length} of 117`)}
-      <div class="chips">${styles.map((s) => `<span class="chip">${esc(s.style)}<span class="n">${s.n}</span></span>`).join('')}</div>
+      <div class="chips">${styles.map((s) =>
+        `<a class="chip" href="/style/${encodeURIComponent(s.style)}">${esc(s.style)}<span class="n">${s.n}</span></a>`).join('')}</div>
     </section>` : ''}
 
     <section class="block">
@@ -577,15 +617,91 @@ async function viewProfile(handle) {
 
   if (mine) {
     app.querySelector('#ledger')?.addEventListener('click', async (e) => {
-      const btn = e.target.closest('button[data-kill]');
-      if (!btn || !confirm('Remove this pour?')) return;
-      btn.disabled = true;
-      try {
-        await api.unpour(btn.dataset.kill);
-        btn.closest('li').remove();
-      } catch { btn.disabled = false; }
+      const del = e.target.closest('button[data-kill]');
+      if (del) {
+        if (!confirm('Delete this entry?')) return;
+        del.disabled = true;
+        try {
+          await api.unpour(del.dataset.kill);
+          del.closest('li').remove();
+        } catch { del.disabled = false; }
+        return;
+      }
+      const ed = e.target.closest('button[data-edit]');
+      if (ed) openEditor(ed, pours.find((x) => String(x.id) === ed.dataset.edit), handle);
     });
   }
+}
+
+// Edit an entry in place. The beer itself is not editable: a pour records a
+// specific thing you drank, and quietly moving it to another beer would corrupt
+// that beer's average for everyone else. Wrong beer means delete and re-log.
+function openEditor(btn, p, handle) {
+  const li = btn.closest('li');
+  if (li.nextElementSibling?.classList.contains('editrow')) {
+    li.nextElementSibling.remove();
+    return;
+  }
+  const row = document.createElement('li');
+  row.className = 'editrow';
+  row.innerHTML = `<div class="panel">
+    <p class="hint" style="margin:0 0 12px">Editing <strong>${esc(p.beer)}</strong> · ${esc(p.brewery)}
+      — the beer can't be changed; delete and re-log if it's wrong.</p>
+    <div class="field">
+      <label>Rating</label>
+      ${starRail(p.rating)}
+    </div>
+    <div class="field">
+      <label for="enote">Review</label>
+      <textarea id="enote" maxlength="2000">${esc(p.note || '')}</textarea>
+    </div>
+    <div class="row two">
+      <div class="field"><label for="edate">When</label>
+        <input id="edate" type="date" value="${esc(p.drunk_on)}" max="${today()}"></div>
+      <div class="field"><label for="evenue">Where</label>
+        <input id="evenue" maxlength="80" value="${esc(p.venue || '')}"></div>
+    </div>
+    <div class="field">
+      <label>How did it come?</label>
+      <div class="chips serving" id="eserv">${['draught','can','bottle','cask'].map((v) =>
+        `<button type="button" class="chip${p.serving === v ? ' chip-on' : ''}" data-serving="${v}">${v}</button>`).join('')}</div>
+      <input type="hidden" id="eservval" value="${esc(p.serving || '')}">
+    </div>
+    <label class="rank-toggle"><input type="checkbox" id="eagain"${p.again ? ' checked' : ''}> I've had this before</label>
+    <div class="beer-acts" style="margin-top:14px">
+      <button class="btn btn-amber" id="esave">Save changes</button>
+      <button class="btn" id="ecancel">Cancel</button>
+    </div>
+    <p class="msg" id="emsg"></p>
+  </div>`;
+  li.after(row);
+  bindStarRail(row);
+
+  const sv = row.querySelector('#eservval');
+  row.querySelector('#eserv').addEventListener('click', (e) => {
+    const c = e.target.closest('button[data-serving]');
+    if (!c) return;
+    const same = sv.value === c.dataset.serving;
+    sv.value = same ? '' : c.dataset.serving;
+    row.querySelectorAll('#eserv .chip').forEach((x) => x.classList.toggle('chip-on', !same && x === c));
+  });
+
+  row.querySelector('#ecancel').addEventListener('click', () => row.remove());
+  row.querySelector('#esave').addEventListener('click', async () => {
+    const msg = row.querySelector('#emsg');
+    msg.className = 'msg'; msg.textContent = 'saving…';
+    try {
+      await api.editPour(p.id, {
+        rating: row.querySelector('#rating').value,
+        note: row.querySelector('#enote').value,
+        drunkOn: row.querySelector('#edate').value,
+        venue: row.querySelector('#evenue').value,
+        serving: sv.value,
+        again: row.querySelector('#eagain').checked,
+      });
+      go(`/@${handle}`);
+    } catch (err) { msg.className = 'msg err'; msg.textContent = err.message; }
+  });
 }
 
 async function viewBeer(brewerySlug, beerSlug) {
@@ -605,14 +721,18 @@ async function viewBeer(brewerySlug, beerSlug) {
       <p class="kicker"><a href="/brewery/${esc(beer.brewerySlug)}">${esc(beer.brewery)}</a>${
         beer.country ? ` · ${esc(beer.country)}` : ''}</p>
       <h2>${esc(beer.name)}</h2>
-      <p>${[beer.style, beer.abv ? `${beer.abv}% ABV` : ''].filter(Boolean).map(esc).join(' · ') || 'Style unrecorded.'}
-        ${style ? `<br><span class="head-note">${esc(style.family)} · ${esc(style.origin)} · typically ${style.abvLow}–${style.abvHigh}%</span>` : ''}</p>
+      <p>${beer.style
+          ? `<a href="/style/${encodeURIComponent(beer.style)}">${esc(beer.style)}</a>`
+          : 'Type of beer not recorded'}${beer.abv ? ` · ${esc(String(beer.abv))}% ABV` : ''}
+        ${style ? `<br><span class="head-note">${esc(style.family)} · ${esc(style.origin)} · usually ${style.abvLow}–${style.abvHigh}%</span>` : ''}</p>
     </section>
 
     <div class="tiles">
       ${tile('average', stats.avg ? `${outOfFive(stats.avg)}★` : '—', stats.rated ? `${plural(stats.rated, 'rating')}` : 'no ratings yet')}
       ${tile('logged', stats.pours ?? 0)}
       ${tile('people', stats.drinkers ?? 0)}
+      ${tile('likes', stats.likes ?? 0)}
+      ${tile('want to try', stats.wants ?? 0)}
     </div>
 
     ${stats.rated ? `<section class="block">
@@ -639,13 +759,41 @@ async function viewBeer(brewerySlug, beerSlug) {
       ${state.me ? `<a class="btn btn-amber" href="/log?brewery=${
         encodeURIComponent(beer.brewery)}&beer=${encodeURIComponent(beer.name)}&style=${
         encodeURIComponent(beer.style || '')}${beer.abv ? `&abv=${beer.abv}` : ''}">Log this beer</a>` : ''}
-      ${state.me?.handle ? '<button class="btn" id="addList">Add to a list</button>' : ''}
+      ${state.me?.handle ? `
+        <button class="btn mark${data.viewer.liked ? ' on' : ''}" id="likeBtn"
+          data-on="${data.viewer.liked ? '1' : '0'}">
+          <span class="ic">${data.viewer.liked ? '♥' : '♡'}</span> <span class="lbl">${
+            data.viewer.liked ? 'Liked' : 'Like'}</span></button>
+        <button class="btn mark${data.viewer.wants ? ' on' : ''}" id="wantBtn"
+          data-on="${data.viewer.wants ? '1' : '0'}">
+          <span class="ic">${data.viewer.wants ? '✓' : '+'}</span> <span class="lbl">${
+            data.viewer.wants ? 'On your list' : 'Want to try'}</span></button>
+        <button class="btn" id="addList">Add to a list</button>` : ''}
     </div>
     <div id="listPicker"></div>
   </div>`;
 
   app.querySelector('#addList')?.addEventListener('click', () =>
     openListPicker(app.querySelector('#listPicker'), beer));
+
+  // A rating says how good it was. The heart says whether you love it. The list
+  // says you mean to try it. Three different questions, so three controls.
+  const bindMark = (id, kind, on_, off_) => {
+    const b = app.querySelector(id);
+    b?.addEventListener('click', async () => {
+      const on = b.dataset.on === '1';
+      b.disabled = true;
+      try {
+        await api.mark(kind, beer.brewerySlug, beer.slug, !on);
+        b.dataset.on = on ? '0' : '1';
+        b.classList.toggle('on', !on);
+        b.querySelector('.ic').textContent = on ? off_[0] : on_[0];
+        b.querySelector('.lbl').textContent = on ? off_[1] : on_[1];
+      } catch (err) { alert(err.message); } finally { b.disabled = false; }
+    });
+  };
+  bindMark('#likeBtn', 'like', ['♥', 'Liked'], ['♡', 'Like']);
+  bindMark('#wantBtn', 'want', ['✓', 'On your list'], ['+', 'Want to try']);
 }
 
 // Pick an existing list or make one on the spot — a beer you want to remember
@@ -1404,6 +1552,60 @@ async function viewBrewery(slug) {
   </div>`;
 }
 
+async function viewStyle(name) {
+  loading();
+  let d;
+  try { d = await api.style(name); } catch (err) { return oops(err.message); }
+  const canon = findStyle(d.style);
+
+  app.innerHTML = `<div class="wrap">
+    <section class="hero">
+      ${canon ? `<p class="kicker">${esc(canon.family)}</p>` : ''}
+      <h2>${esc(d.style)}</h2>
+      ${canon ? `<p>From ${esc(canon.origin)}. Usually ${canon.abvLow}–${canon.abvHigh}% ABV.</p>` : ''}
+    </section>
+
+    <div class="tiles">
+      ${tile('beers', d.stats.beers ?? 0)}
+      ${tile('logged', d.stats.pours ?? 0)}
+      ${tile('people', d.stats.drinkers ?? 0)}
+      ${tile('average', d.stats.avg ? `${outOfFive(d.stats.avg)}★` : '—', d.stats.avg ? 'out of 5' : 'no ratings yet')}
+    </div>
+
+    <section class="block">
+      ${blockHead('Beers', plural(d.beers.length, 'beer'))}
+      ${d.beers.length
+        ? `<ul class="litems">${d.beers.map((b) => beerRow(b)).join('')}</ul>`
+        : `<div class="empty"><p>Nobody has logged a ${esc(d.style)} yet.</p>
+            ${state.me ? `<a class="btn btn-amber" href="/log?style=${encodeURIComponent(d.style)}">Be the first</a>` : ''}</div>`}
+    </section>
+  </div>`;
+}
+
+// Want-to-try and liked — the two shelves a rating cannot express.
+async function viewShelf(handle, kind) {
+  loading();
+  const want = kind === 'wishlist';
+  let d;
+  try { d = want ? await api.wishlist(handle) : await api.likes(handle); }
+  catch (err) { return oops(err.message); }
+  const mine = state.me?.handle === d.handle;
+
+  app.innerHTML = `<div class="wrap">
+    <section class="hero"><p class="kicker">@${esc(d.handle)}</p>
+      <h2>${want ? 'Want to try' : 'Liked'}</h2>
+      <p>${want
+        ? (mine ? 'Beers you have marked to try.' : `Beers @${esc(d.handle)} means to try.`)
+        : (mine ? 'Beers you have liked.' : `Beers @${esc(d.handle)} likes.`)}</p></section>
+    <section class="block">
+      ${d.beers.length
+        ? `<ul class="litems">${d.beers.map((b) => beerRow(b)).join('')}</ul>`
+        : `<div class="empty"><p>Nothing here yet.</p>
+            <p class="hint">Open any beer and press ${want ? '“Want to try”' : '“Like”'}.</p></div>`}
+    </section>
+  </div>`;
+}
+
 // ---- boot ------------------------------------------------------------------
 
 function render() {
@@ -1426,6 +1628,8 @@ function render() {
     case 'privacy': return viewPrivacy();
     case 'map': return viewMap();
     case 'search': return viewSearch();
+    case 'style': return viewStyle(r.name);
+    case 'shelf': return viewShelf(r.handle, r.kind);
     case 'brewery': return viewBrewery(r.slug);
     default: return oops('There is nothing at that address.');
   }

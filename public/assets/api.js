@@ -22,6 +22,13 @@ export const api = {
   searchBeers: (q) => req(`/search/beers?q=${encodeURIComponent(q)}`),
   pour: (body) => req('/pours', { method: 'POST', body }),
   unpour: (id) => req(`/pours/${id}`, { method: 'DELETE' }),
+  editPour: (id, body) => req(`/pours/${id}`, { method: 'PATCH', body }),
+  mark: (kind, brewery, beer, on) =>
+    req(`/mark/${kind}/${encodeURIComponent(brewery)}/${encodeURIComponent(beer)}`,
+        { method: on ? 'POST' : 'DELETE' }),
+  wishlist: (handle) => req(`/users/${encodeURIComponent(handle)}/wishlist`),
+  likes: (handle) => req(`/users/${encodeURIComponent(handle)}/likes`),
+  style: (name) => req(`/styles/${encodeURIComponent(name)}`),
   profile: (handle) => req(`/users/${encodeURIComponent(handle)}`),
   beer: (brewery, beer) => req(`/beers/${encodeURIComponent(brewery)}/${encodeURIComponent(beer)}`),
   recent: () => req('/recent'),

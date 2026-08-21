@@ -58,6 +58,8 @@ CREATE TABLE IF NOT EXISTS pours (
   photo_key  TEXT,                        -- R2 object key for the drinker's shot
   venue_id   INTEGER REFERENCES venues(id) ON DELETE SET NULL,
   geo_private INTEGER NOT NULL DEFAULT 0, -- 1 = never on a public map
+  again      INTEGER NOT NULL DEFAULT 0,  -- had it before (Letterboxd's rewatch)
+  edited_at  INTEGER,                     -- NULL = never edited since logging
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_pours_user ON pours(user_id, drunk_on DESC);
@@ -110,3 +112,21 @@ CREATE TABLE IF NOT EXISTS list_items (
   PRIMARY KEY (list_id, beer_id)
 );
 CREATE INDEX IF NOT EXISTS idx_list_items_order ON list_items(list_id, position);
+
+-- Want to try. The watchlist.
+CREATE TABLE IF NOT EXISTS wishlist (
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  beer_id    INTEGER NOT NULL REFERENCES beers(id) ON DELETE CASCADE,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, beer_id)
+);
+CREATE INDEX IF NOT EXISTS idx_wishlist_beer ON wishlist(beer_id);
+
+-- The heart. Independent of the score, exactly as on Letterboxd.
+CREATE TABLE IF NOT EXISTS likes (
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  beer_id    INTEGER NOT NULL REFERENCES beers(id) ON DELETE CASCADE,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, beer_id)
+);
+CREATE INDEX IF NOT EXISTS idx_likes_beer ON likes(beer_id);

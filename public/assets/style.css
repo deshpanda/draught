@@ -411,3 +411,14 @@ button.chip { font: inherit; cursor: pointer; }
 @media (max-width: 620px) { .navsearch { order: 99; width: 100%; } .navsearch input { width: 100%; } }
 .rowacts { display: inline-flex; gap: 4px; align-items: center; }
 .rowacts .kill:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ---------- marks, quick styles, inline editor ---------- */
+.btn.mark { display: inline-flex; align-items: center; gap: 6px; }
+.btn.mark .ic { font-size: 1rem; line-height: 1; }
+.btn.mark.on { background: var(--amber); color: var(--on-amber); }
+.quickstyles { margin-top: 9px; }
+.quickstyles .chip { font-size: 0.8rem; }
+.chips.serving .chip { text-transform: capitalize; }
+.editrow { padding: 0 0 14px !important; border-bottom: 1px solid var(--line) !important; }
+.editrow .panel { max-width: 560px; }
+.pours .again { color: var(--faint); margin-left: 5px; font-size: 0.85em; }
