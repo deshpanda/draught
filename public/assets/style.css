@@ -374,3 +374,27 @@ button.chip { font: inherit; cursor: pointer; }
   .phead-act { margin-left: 0; width: 100%; }
   .phead-act .btn { width: 100%; text-align: center; }
 }
+
+/* ---------- account menu ---------- */
+.menu { position: relative; display: inline-flex; }
+.site-nav .me {
+  display: inline-flex; align-items: center; gap: 7px;
+  text-transform: none; letter-spacing: 0; font-size: 0.9rem;
+}
+.site-nav .me .caret { font-size: 0.7rem; color: var(--faint); }
+.site-nav .me[aria-expanded="true"] { color: var(--text); }
+.menu-pop {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 20;
+  min-width: 168px; display: flex; flex-direction: column;
+  background: var(--surface-2); border-radius: var(--r);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.55); overflow: hidden;
+}
+.menu-pop[hidden] { display: none; }
+.menu-pop a, .menu-pop button {
+  font: inherit; font-size: 0.88rem; text-align: left; text-transform: none;
+  letter-spacing: 0; color: var(--text); background: none; border: 0;
+  padding: 10px 14px; cursor: pointer; white-space: nowrap;
+}
+.menu-pop a:hover, .menu-pop button:hover { background: var(--line-2); color: var(--text); }
+.menu-pop button { border-top: 1px solid var(--line); color: var(--muted); }
+.menu-pop button:hover { color: var(--red); }

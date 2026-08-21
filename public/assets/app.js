@@ -78,11 +78,42 @@ function renderNav() {
     <a href="/recent"${on('/recent')}>Everyone</a>
     <a href="/lists"${on('/lists')}>Lists</a>
     <a href="/map"${on('/map')}>Map</a>
-    ${h ? `<a class="me" href="/@${esc(h)}"${on(`/@${h}`)}>${
-      state.me.avatar
-        ? `<img class="avatar" src="${esc(state.me.avatar)}" alt="" referrerpolicy="no-referrer">`
-        : ''}${esc(h)}</a>` : ''}
+    ${h ? `<span class="menu">
+      <button class="me" id="meBtn" aria-expanded="false" aria-haspopup="true">${
+        state.me.avatar
+          ? `<img class="avatar" src="${esc(state.me.avatar)}" alt="" referrerpolicy="no-referrer">`
+          : ''}${esc(h)} <span class="caret">▾</span></button>
+      <span class="menu-pop" id="mePop" hidden>
+        <a href="/@${esc(h)}">Your profile</a>
+        <a href="/@${esc(h)}/lists">Your lists</a>
+        <a href="/settings">Settings</a>
+        <button id="signout">Sign out</button>
+      </span>
+    </span>` : ''}
     <a class="cta" href="/log">+ Log</a>`;
+
+  // Account menu. Sign out has to be reachable in one click from anywhere —
+  // burying it on the settings page behind "Edit profile" made it unfindable.
+  const btn = nav.querySelector('#meBtn');
+  const pop = nav.querySelector('#mePop');
+  if (btn && pop) {
+    const close = () => { pop.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = pop.hidden;
+      pop.hidden = !open;
+      btn.setAttribute('aria-expanded', String(open));
+    });
+    document.addEventListener('click', close);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    pop.addEventListener('click', (e) => e.stopPropagation());
+    nav.querySelector('#signout').addEventListener('click', async () => {
+      close();
+      await api.logout().catch(() => {});
+      state.me = null; state.stats = null;
+      go('/');
+    });
+  }
 }
 
 const loading = () => { app.innerHTML = '<p class="loading">pouring…</p>'; };
